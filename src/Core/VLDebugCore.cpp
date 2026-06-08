@@ -74,6 +74,91 @@ bool DebugCore::attach() {
     return attachLocked();
 }
 
+bool DebugCore::probeAvailability() {
+    task_t task = mach_task_self();
+    if (task == MACH_PORT_NULL) return false;
+
+    mach_port_t probePort = MACH_PORT_NULL;
+    kern_return_t kr = mach_port_allocate(task, MACH_PORT_RIGHT_RECEIVE, &probePort);
+    if (kr != KERN_SUCCESS) return false;
+
+    kr = mach_port_insert_right(task, probePort, probePort, MACH_MSG_TYPE_MAKE_SEND);
+    if (kr != KERN_SUCCESS) {
+        mach_port_deallocate(task, probePort);
+        return false;
+    }
+
+    exception_mask_t masks[EXC_TYPES_COUNT]{};
+    exception_handler_t oldHandlers[EXC_TYPES_COUNT]{};
+    exception_behavior_t oldBehaviors[EXC_TYPES_COUNT]{};
+    thread_state_flavor_t oldFlavors[EXC_TYPES_COUNT]{};
+    mach_msg_type_number_t oldCount = EXC_TYPES_COUNT;
+
+    kr = task_swap_exception_ports(task,
+                                   EXC_MASK_BREAKPOINT,
+                                   probePort,
+                                   (exception_behavior_t)(EXCEPTION_DEFAULT | MACH_EXCEPTION_CODES),
+                                   ARM_THREAD_STATE64,
+                                   masks,
+                                   &oldCount,
+                                   oldHandlers,
+                                   oldBehaviors,
+                                   oldFlavors);
+
+    bool exceptionOK = (kr == KERN_SUCCESS);
+    if (exceptionOK) {
+        if (oldCount == 0) {
+            task_set_exception_ports(task,
+                                     EXC_MASK_BREAKPOINT,
+                                     MACH_PORT_NULL,
+                                     EXCEPTION_DEFAULT,
+                                     ARM_THREAD_STATE64);
+        }
+        for (mach_msg_type_number_t i = 0; i < oldCount; i++) {
+            task_set_exception_ports(task,
+                                     masks[i],
+                                     oldHandlers[i],
+                                     oldBehaviors[i],
+                                     oldFlavors[i]);
+            if (oldHandlers[i] != MACH_PORT_NULL) {
+                mach_port_deallocate(task, oldHandlers[i]);
+            }
+        }
+    }
+
+    mach_port_deallocate(task, probePort);
+    if (!exceptionOK) return false;
+
+    thread_act_array_t threads = nullptr;
+    mach_msg_type_number_t threadCount = 0;
+    kr = task_threads(task, &threads, &threadCount);
+    if (kr != KERN_SUCCESS || threadCount == 0) return false;
+
+    bool debugStateOK = false;
+    for (mach_msg_type_number_t t = 0; t < threadCount; t++) {
+        arm_debug_state64_t dbgState{};
+        mach_msg_type_number_t dbgCount = ARM_DEBUG_STATE64_COUNT;
+
+        kr = thread_get_state(threads[t], ARM_DEBUG_STATE64,
+                              (thread_state_t)&dbgState, &dbgCount);
+        if (kr != KERN_SUCCESS) continue;
+
+        kr = thread_set_state(threads[t], ARM_DEBUG_STATE64,
+                              (thread_state_t)&dbgState, ARM_DEBUG_STATE64_COUNT);
+        if (kr == KERN_SUCCESS) {
+            debugStateOK = true;
+            break;
+        }
+    }
+
+    for (mach_msg_type_number_t t = 0; t < threadCount; t++) {
+        mach_port_deallocate(task, threads[t]);
+    }
+    vm_deallocate(task, (vm_address_t)threads, threadCount * sizeof(thread_act_t));
+
+    return debugStateOK;
+}
+
 // 内部版本，调用者必须已持有 _mutex
 bool DebugCore::attachLocked() {
     if (_attached) return true;

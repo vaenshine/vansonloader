@@ -84,9 +84,15 @@ public:
     std::vector<DiffRegion> compareWithBaseline(uint64_t minChangeSize = 8);
     
     // ========== 快速模糊搜索 ==========
+    struct FastFuzzySnapshotRegion {
+        uint64_t start;
+        uint64_t size;
+        uint64_t fileOffset;
+    };
+
     void fastFuzzyInit();
     size_t getFastFuzzyAddressCount() const;
-    bool hasFastFuzzySnapshot() const { return !_fastFuzzySnapshot.empty(); }
+    bool hasFastFuzzySnapshot() const { return !_fastFuzzySnapshot.empty() || _resultCount > 0; }
     std::vector<ScanResult> fastFuzzyFilter(MemDataType type, int filterMode,
                                             uint64_t start = 0, uint64_t end = 0);
     void clearFastFuzzySnapshot();
@@ -107,11 +113,13 @@ private:
     
     std::string _storagePath;
     std::string _swapPath;
+    std::string _fastFuzzySnapshotPath;
     size_t _resultCount;
+    size_t _fastFuzzyAddressCount = 0;
     
     std::vector<SnapshotRegion> _snapshot;
     std::vector<SnapshotRegion> _baselineSnapshot;
-    std::vector<SnapshotRegion> _fastFuzzySnapshot;
+    std::vector<FastFuzzySnapshotRegion> _fastFuzzySnapshot;
     
     void parseValue(const std::string& valStr, MemDataType type, void* outVal);
 };

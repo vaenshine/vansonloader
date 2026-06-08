@@ -1,7 +1,7 @@
 /**
  * VansonLoader L2.3 - Hardware Watchpoint Engine
  * ARM64 硬件断点监控 + 异常捕获 + 堆栈符号化
- * 仅越狱环境可用
+ * 当前进程 ARM64 硬件 watchpoint 能力探测
  */
 
 #ifndef VLDebugCore_hpp
@@ -89,6 +89,7 @@ public:
     bool attach();                    // 附加到当前进程
     void detach();
     bool isAttached() const { return _attached; }
+    bool probeAvailability();         // 当前进程运行时能力探测
     
     // 断点管理
     int addWatch(uint64_t address, WatchType type = WatchType::Write,

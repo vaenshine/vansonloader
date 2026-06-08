@@ -2,7 +2,7 @@
 
 **VansonLoader는 VansonMod의 dylib 에디션입니다. VansonMod 런타임에서 파생된 패키지로, 선택된 VM 워크플로를 주입된 프로세스 안의 플로팅 패널로 제공합니다.**
 
-[English](./README.md) | [简体中文](./README_CN.md) | [繁體中文](./README_TW.md) | [العربية](./README_AR.md) | [Deutsch](./README_DE.md) | [Español](./README_ES.md) | [Français](./README_FR.md) | [日本語](./README_JA.md) | **한국어** | [Português](./README_PT.md) | [Русский](./README_RU.md) | [ไทย](./README_TH.md) | [Tiếng Việt](./README_VI.md)
+[English](../README.md) | [简体中文](./README_CN.md) | [繁體中文](./README_TW.md) | [العربية](./README_AR.md) | [Deutsch](./README_DE.md) | [Español](./README_ES.md) | [Français](./README_FR.md) | [日本語](./README_JA.md) | **한국어** | [Português](./README_PT.md) | [Русский](./README_RU.md) | [ไทย](./README_TH.md) | [Tiếng Việt](./README_VI.md)
 
 ![Platform](https://img.shields.io/badge/Platform-iOS%2014.0%2B-black)
 ![Package](https://img.shields.io/badge/Package-Theos%20dylib-blue)

@@ -2,7 +2,7 @@
 
 **VansonLoader est l'édition dylib de VansonMod. C'est un paquet runtime dérivé qui apporte certains flux VM dans un panneau flottant injecté dans le processus cible.**
 
-[English](./README.md) | [简体中文](./README_CN.md) | [繁體中文](./README_TW.md) | [العربية](./README_AR.md) | [Deutsch](./README_DE.md) | [Español](./README_ES.md) | **Français** | [日本語](./README_JA.md) | [한국어](./README_KO.md) | [Português](./README_PT.md) | [Русский](./README_RU.md) | [ไทย](./README_TH.md) | [Tiếng Việt](./README_VI.md)
+[English](../README.md) | [简体中文](./README_CN.md) | [繁體中文](./README_TW.md) | [العربية](./README_AR.md) | [Deutsch](./README_DE.md) | [Español](./README_ES.md) | **Français** | [日本語](./README_JA.md) | [한국어](./README_KO.md) | [Português](./README_PT.md) | [Русский](./README_RU.md) | [ไทย](./README_TH.md) | [Tiếng Việt](./README_VI.md)
 
 ![Platform](https://img.shields.io/badge/Platform-iOS%2014.0%2B-black)
 ![Package](https://img.shields.io/badge/Package-Theos%20dylib-blue)

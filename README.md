@@ -2,7 +2,7 @@
 
 **VansonLoader is the dylib edition of VansonMod. It is a derived runtime package that brings selected VM workflows into an injected in-process floating panel.**
 
-**English** | [简体中文](./README_CN.md) | [繁體中文](./README_TW.md) | [العربية](./README_AR.md) | [Deutsch](./README_DE.md) | [Español](./README_ES.md) | [Français](./README_FR.md) | [日本語](./README_JA.md) | [한국어](./README_KO.md) | [Português](./README_PT.md) | [Русский](./README_RU.md) | [ไทย](./README_TH.md) | [Tiếng Việt](./README_VI.md)
+**English** | [简体中文](./docs/README_CN.md) | [繁體中文](./docs/README_TW.md) | [العربية](./docs/README_AR.md) | [Deutsch](./docs/README_DE.md) | [Español](./docs/README_ES.md) | [Français](./docs/README_FR.md) | [日本語](./docs/README_JA.md) | [한국어](./docs/README_KO.md) | [Português](./docs/README_PT.md) | [Русский](./docs/README_RU.md) | [ไทย](./docs/README_TH.md) | [Tiếng Việt](./docs/README_VI.md)
 
 ![Platform](https://img.shields.io/badge/Platform-iOS%2014.0%2B-black)
 ![Package](https://img.shields.io/badge/Package-Theos%20dylib-blue)

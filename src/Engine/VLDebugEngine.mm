@@ -40,7 +40,12 @@ extern "C" void VLDebugSetLogPath(const char *path);
 }
 
 + (BOOL)isAvailable {
-    return SecCore::inst().isJailbroken();
+    static BOOL available = NO;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        available = DebugCore::inst().probeAvailability() ? YES : NO;
+    });
+    return available;
 }
 
 - (BOOL)attach {
