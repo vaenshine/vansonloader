@@ -15,6 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 确保窗口在最顶层
 + (void)bringToFront;
 
+/// 挂载到当前活跃 scene
+- (void)attachActiveSceneIfNeeded;
+
 @end
 
 NS_ASSUME_NONNULL_END

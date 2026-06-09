@@ -951,8 +951,24 @@ VPanelImpl *g_panel = nil;
 
 @implementation VLPanel
 
++ (void)attachPanelToCurrentWindowIfNeeded {
+    if (!g_panel) return;
+    UIWindow *w = GetSafeWindow();
+    if (!w) return;
+    if (g_panel.superview != w) {
+        [g_panel removeFromSuperview];
+        g_panel.frame = w.bounds;
+        [w addSubview:g_panel];
+    } else if (!CGRectEqualToRect(g_panel.frame, w.bounds)) {
+        g_panel.frame = w.bounds;
+    }
+}
+
 + (void)initializeIfNeeded {
-    if (g_panel) return;
+    if (g_panel) {
+        [self attachPanelToCurrentWindowIfNeeded];
+        return;
+    }
     UIWindow *w = GetSafeWindow();
     if (!w) return;
 
@@ -964,6 +980,7 @@ VPanelImpl *g_panel = nil;
 + (void)show {
     if (!g_panel) [self initializeIfNeeded];
     if (!g_panel) return;
+    [self attachPanelToCurrentWindowIfNeeded];
     [g_panel.superview bringSubviewToFront:g_panel];
     [g_panel showWithAnimation];
 }
