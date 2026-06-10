@@ -126,7 +126,7 @@ std::map<std::string, std::string> getLangTH() {
         {"Mode_Slider", "สไลเดอร์"},
         {"Mode_Switch", "สวิตช์"},
         {"About_Version", "เวอร์ชัน %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "ค้นหาหน่วยความจำ"},
         {"Mem_Debug_Title", "ดีบักหน่วยความจำ"},
         {"Mem_OpenSearch", "เปิดดีบักหน่วยความจำ"},
@@ -222,6 +222,19 @@ std::map<std::string, std::string> getLangTH() {
         {"Mem_Tab_Exact", "แม่นยำ"},
         {"Mem_Tab_Fuzzy", "คลุมเครือ"},
         {"Mem_Tab_Group", "กลุ่ม"},
+
+        {"Timeline_Title", "ไทม์ไลน์การค้นหา"},
+        {"Timeline_Empty", "ไม่มีสแนปช็อตการค้นหา"},
+        {"Timeline_Clear", "ล้างไทม์ไลน์"},
+        {"Timeline_Restored_Fmt", "กู้คืน %@ · %lu รายการ"},
+        {"Timeline_Restore_Failed", "กู้คืนล้มเหลว"},
+        {"Timeline_Mode_Exact", "ค้นหาแบบตรงค่า"},
+        {"Timeline_Mode_Fuzzy", "ค้นหาแบบคลุมเครือ"},
+        {"Timeline_Mode_Group", "ค้นหาแบบกลุ่ม"},
+        {"Timeline_Mode_Between", "ค้นหาตามช่วง"},
+        {"Undo_Last_Modify", "ย้อนกลับการแก้ไขล่าสุด"},
+        {"Undo_Success", "ย้อนกลับการแก้ไขแล้ว"},
+        {"Undo_Failed", "ย้อนกลับล้มเหลว"},
 
         // ค้นหาหน่วยความจำเพิ่มเติม
         {"Mem_GroupHint", "ใช้ ; หรือ :: เพื่อแยกค่า"},

@@ -157,7 +157,7 @@ std::map<std::string, std::string> getLangEN() {
         {"Mode_Slider", "Slider"},
         {"Mode_Switch", "Switch"},
         {"About_Version", "Version %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
 
         // Memory Debug (renamed from Memory Search)
         {"Mem_Title", "Memory Search"},
@@ -284,6 +284,19 @@ std::map<std::string, std::string> getLangEN() {
         {"Mem_Tab_Exact", "Exact"},
         {"Mem_Tab_Fuzzy", "Fuzzy"},
         {"Mem_Tab_Group", "Group"},
+
+        {"Timeline_Title", "Search Timeline"},
+        {"Timeline_Empty", "No search snapshots"},
+        {"Timeline_Clear", "Clear Timeline"},
+        {"Timeline_Restored_Fmt", "Restored %@ · %lu results"},
+        {"Timeline_Restore_Failed", "Restore failed"},
+        {"Timeline_Mode_Exact", "Exact Search"},
+        {"Timeline_Mode_Fuzzy", "Fuzzy Search"},
+        {"Timeline_Mode_Group", "Group Search"},
+        {"Timeline_Mode_Between", "Range Search"},
+        {"Undo_Last_Modify", "Undo Last Modify"},
+        {"Undo_Success", "Modify undone"},
+        {"Undo_Failed", "Undo failed"},
 
         // Memory Search Additional
         {"Mem_GroupHint", "Use ; or :: to separate values"},

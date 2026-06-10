@@ -366,6 +366,14 @@ static VLMemResultsImpl *g_memResults = nil;
     _countLabel.textAlignment = NSTextAlignmentRight;
     [_panelView addSubview:_countLabel];
     
+    UIButton *timelineBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    timelineBtn.frame = CGRectMake(w - 70, 6, 30, 30);
+    [timelineBtn setTitle:@"↺" forState:UIControlStateNormal];
+    [timelineBtn setTitleColor:[[UIColor cyanColor] colorWithAlphaComponent:0.7] forState:UIControlStateNormal];
+    timelineBtn.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    [timelineBtn addTarget:self action:@selector(showTimelineSheet) forControlEvents:UIControlEventTouchUpInside];
+    [_panelView addSubview:timelineBtn];
+
     // 搜索结果窗口不需要关闭按钮（与内存调试双生）
     // 只保留最小化按钮
     UIButton *minBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -441,6 +449,53 @@ static VLMemResultsImpl *g_memResults = nil;
     [self loadResults];
 }
 
+- (NSString *)timelineTypeName:(VMemDataType)type {
+    NSArray *names = @[@"I8", @"I16", @"I32", @"I64", @"U8", @"U16", @"U32", @"U64", @"F32", @"F64", @"Str"];
+    if (type < names.count) return names[type];
+    return @"?";
+}
+
+- (void)showTimelineSheet {
+    NSArray<VLMemTimelineItem *> *items = [[VMemEngine shared] timelineItems];
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:VL(@"Timeline_Title")
+                                                                message:items.count > 0 ? nil : VL(@"Timeline_Empty")
+                                                         preferredStyle:UIAlertControllerStyleActionSheet];
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateFormat = @"HH:mm:ss";
+
+    for (NSUInteger i = 0; i < items.count; i++) {
+        VLMemTimelineItem *item = items[i];
+        NSString *time = [fmt stringFromDate:item.date ?: [NSDate date]];
+        NSString *title = [NSString stringWithFormat:@"%@  %@ · %lu",
+                                                     time,
+                                                     item.title ?: @"",
+                                                     (unsigned long)item.resultCount];
+        NSString *detail = item.detail.length > 0 ? item.detail : @"";
+        NSString *actionTitle = detail.length > 0 ? [NSString stringWithFormat:@"%@\n%@", title, detail] : title;
+        [ac addAction:[UIAlertAction actionWithTitle:actionTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            if ([[VMemEngine shared] restoreTimelineAtIndex:i]) {
+                g_currentType = item.dataType;
+                [self loadResults];
+                showToast([NSString stringWithFormat:VL(@"Timeline_Restored_Fmt"), time, (unsigned long)item.resultCount]);
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"VLMemResultsDidRestore" object:nil];
+            } else {
+                showToast(VL(@"Timeline_Restore_Failed"));
+            }
+        }]];
+    }
+
+    if (items.count > 0) {
+        [ac addAction:[UIAlertAction actionWithTitle:VL(@"Timeline_Clear") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
+            [[VMemEngine shared] clearTimeline];
+        }]];
+    }
+    [ac addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
+
+    UIViewController *root = GetSafeWindow().rootViewController;
+    while (root.presentedViewController) root = root.presentedViewController;
+    [root presentViewController:ac animated:YES completion:nil];
+}
+
 - (void)onNearbySearch {
     NSUInteger total = [VMemEngine shared].resultCount;
     if (total == 0) {
@@ -493,6 +548,12 @@ static VLMemResultsImpl *g_memResults = nil;
                                            range:range
                                       completion:^(NSUInteger count, NSString *msg) {
             if (count > 0) {
+                NSString *detail = [NSString stringWithFormat:@"%@ %@",
+                                                              [self timelineTypeName:g_currentType],
+                                                              valueStr ?: @""];
+                [[VMemEngine shared] captureTimelineWithTitle:VL(@"Nearby_Btn")
+                                                       detail:detail
+                                                     dataType:g_currentType];
                 showToast([NSString stringWithFormat:@"%@ %lu", VL(@"Mem_Found"), (unsigned long)count]);
             } else {
                 showToast(VL(@"Msg_NoResult"));
@@ -802,6 +863,31 @@ static VLMemResultsImpl *g_memResults = nil;
     [self showEditAlertForItem:item atIndex:indexPath.row];
 }
 
+- (NSUInteger)writeSizeForType:(VMemDataType)type oldValue:(NSString *)oldValue newValue:(NSString *)newValue {
+    switch (type) {
+        case VMemDataTypeI8:
+        case VMemDataTypeU8:
+            return 1;
+        case VMemDataTypeI16:
+        case VMemDataTypeU16:
+            return 2;
+        case VMemDataTypeI64:
+        case VMemDataTypeU64:
+        case VMemDataTypeF64:
+            return 8;
+        case VMemDataTypeString: {
+            NSUInteger oldLen = [oldValue lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+            NSUInteger newLen = [newValue lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+            return MAX((NSUInteger)1, MAX(oldLen, newLen));
+        }
+        case VMemDataTypeI32:
+        case VMemDataTypeU32:
+        case VMemDataTypeF32:
+        default:
+            return 4;
+    }
+}
+
 - (void)showEditAlertForItem:(VMemResultItem *)item atIndex:(NSInteger)index {
     UIAlertController *ac = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"0x%llX", item.address] message:nil preferredStyle:UIAlertControllerStyleAlert];
     [ac addTextFieldWithConfigurationHandler:^(UITextField *tf) {
@@ -810,10 +896,33 @@ static VLMemResultsImpl *g_memResults = nil;
         tf.placeholder = VL(@"Mem_NewValue");
     }];
     [ac addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
+    VMemDataType itemType = [self displayTypeForItem:item];
+    VLMemWriteUndoItem *undo = [[VMemEngine shared] lastManualWriteUndoForAddress:item.address type:itemType];
+    if (undo) {
+        NSString *undoTitle = [NSString stringWithFormat:@"%@: %@", VL(@"Undo_Last_Modify"), undo.oldValue ?: @""];
+        [ac addAction:[UIAlertAction actionWithTitle:undoTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            BOOL ok = [[VMemEngine shared] undoLastManualWriteForAddress:item.address type:itemType];
+            if (ok) {
+                item.valueStr = undo.oldValue;
+                [self->_tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:index inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
+                showToast(VL(@"Undo_Success"));
+            } else {
+                showToast(VL(@"Undo_Failed"));
+            }
+        }]];
+    }
     [ac addAction:[UIAlertAction actionWithTitle:VL(@"Mem_Write") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
         NSString *newVal = ac.textFields.firstObject.text;
         if (newVal.length > 0) {
-            BOOL ok = [[VMemEngine shared] writeAddress:item.address value:newVal type:[self displayTypeForItem:item]];
+            NSString *oldVal = [[VMemEngine shared] readAddress:item.address type:itemType];
+            NSUInteger oldSize = [self writeSizeForType:itemType oldValue:oldVal newValue:newVal];
+            NSData *oldData = [[VMemEngine shared] readMemory:item.address length:oldSize];
+            [[VMemEngine shared] rememberManualWriteUndoAtAddress:item.address
+                                                            type:itemType
+                                                        oldValue:oldVal
+                                                         oldData:oldData
+                                                        newValue:newVal];
+            BOOL ok = [[VMemEngine shared] writeAddress:item.address value:newVal type:itemType];
             if (ok) {
                 item.valueStr = newVal;
                 if (self->_lockedItems[@(item.address)]) {

@@ -157,7 +157,7 @@ std::map<std::string, std::string> getLangCN() {
         {"Mode_Slider", "滑块"},
         {"Mode_Switch", "开关"},
         {"About_Version", "版本 %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: 搜索时间线、结果恢复、写入撤回\nOpen Source: GPL-3.0"},
 
         // 内存调试 (原内存搜索)
         {"Mem_Title", "内存搜索"},
@@ -284,6 +284,19 @@ std::map<std::string, std::string> getLangCN() {
         {"Mem_Tab_Exact", "精确"},
         {"Mem_Tab_Fuzzy", "模糊"},
         {"Mem_Tab_Group", "联合"},
+
+        {"Timeline_Title", "搜索时间线"},
+        {"Timeline_Empty", "暂无搜索快照"},
+        {"Timeline_Clear", "清空时间线"},
+        {"Timeline_Restored_Fmt", "已恢复 %@ · %lu 条"},
+        {"Timeline_Restore_Failed", "恢复失败"},
+        {"Timeline_Mode_Exact", "精确搜索"},
+        {"Timeline_Mode_Fuzzy", "模糊搜索"},
+        {"Timeline_Mode_Group", "联合搜索"},
+        {"Timeline_Mode_Between", "范围搜索"},
+        {"Undo_Last_Modify", "撤回上次修改"},
+        {"Undo_Success", "已撤回修改"},
+        {"Undo_Failed", "撤回失败"},
 
         // 内存搜索附加
         {"Mem_GroupHint", "使用 ; 或 :: 分隔多个值"},

@@ -126,7 +126,7 @@ std::map<std::string, std::string> getLangAR() {
         {"Mode_Slider", "منزلق"},
         {"Mode_Switch", "مفتاح"},
         {"About_Version", "الإصدار %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "بحث الذاكرة"},
         {"Mem_Debug_Title", "تصحيح الذاكرة"},
         {"Mem_OpenSearch", "فتح تصحيح الذاكرة"},
@@ -222,6 +222,19 @@ std::map<std::string, std::string> getLangAR() {
         {"Mem_Tab_Exact", "دقيق"},
         {"Mem_Tab_Fuzzy", "ضبابي"},
         {"Mem_Tab_Group", "مجموعة"},
+
+        {"Timeline_Title", "الخط الزمني للبحث"},
+        {"Timeline_Empty", "لا توجد لقطات بحث"},
+        {"Timeline_Clear", "مسح الخط الزمني"},
+        {"Timeline_Restored_Fmt", "تمت استعادة %@ · %lu نتيجة"},
+        {"Timeline_Restore_Failed", "فشلت الاستعادة"},
+        {"Timeline_Mode_Exact", "بحث مطابق"},
+        {"Timeline_Mode_Fuzzy", "بحث تقريبي"},
+        {"Timeline_Mode_Group", "بحث جماعي"},
+        {"Timeline_Mode_Between", "بحث بالنطاق"},
+        {"Undo_Last_Modify", "تراجع عن آخر تعديل"},
+        {"Undo_Success", "تم التراجع عن التعديل"},
+        {"Undo_Failed", "فشل التراجع"},
 
         // بحث الذاكرة إضافي
         {"Mem_GroupHint", "استخدم ; أو :: للفصل"},

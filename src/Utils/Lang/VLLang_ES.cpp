@@ -127,7 +127,7 @@ std::map<std::string, std::string> getLangES() {
         {"Mode_Slider", "Deslizador"},
         {"Mode_Switch", "Interruptor"},
         {"About_Version", "Versión %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "Búsqueda de memoria"},
         {"Mem_Debug_Title", "Depuración de memoria"},
         {"Mem_OpenSearch", "Abrir depuración de memoria"},
@@ -223,6 +223,19 @@ std::map<std::string, std::string> getLangES() {
         {"Mem_Tab_Exact", "Exacto"},
         {"Mem_Tab_Fuzzy", "Difuso"},
         {"Mem_Tab_Group", "Grupo"},
+
+        {"Timeline_Title", "Linea de busqueda"},
+        {"Timeline_Empty", "Sin instantaneas de busqueda"},
+        {"Timeline_Clear", "Borrar linea"},
+        {"Timeline_Restored_Fmt", "Restaurado %@ · %lu resultados"},
+        {"Timeline_Restore_Failed", "Error al restaurar"},
+        {"Timeline_Mode_Exact", "Busqueda exacta"},
+        {"Timeline_Mode_Fuzzy", "Busqueda difusa"},
+        {"Timeline_Mode_Group", "Busqueda de grupo"},
+        {"Timeline_Mode_Between", "Busqueda por rango"},
+        {"Undo_Last_Modify", "Deshacer ultima modificacion"},
+        {"Undo_Success", "Modificacion deshecha"},
+        {"Undo_Failed", "Error al deshacer"},
 
         // Búsqueda de memoria adicional
         {"Mem_GroupHint", "Use ; o :: para separar valores"},

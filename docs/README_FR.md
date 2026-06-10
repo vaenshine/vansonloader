@@ -26,7 +26,7 @@
 ## Périmètre Actuel
 
 - Panneau flottant et bouton d'ouverture rapide dans le processus injecté.
-- Recherche mémoire, résultats, navigation mémoire et édition de valeurs.
+- Recherche mémoire, résultats, navigation mémoire, édition de valeurs, restauration depuis la timeline et annulation de la dernière écriture manuelle.
 - Importation et stockage des données VM/VL `.vm` et `.vmsc`.
 - Éléments pointer importés pour affichage de valeur, écriture de valeur, contrôles de type lock et modes UI par résultat.
 - Éléments RVA importés pour patch et restore au runtime.

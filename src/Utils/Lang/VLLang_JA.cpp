@@ -157,7 +157,7 @@ std::map<std::string, std::string> getLangJA() {
         {"Mode_Slider", "スライダー"},
         {"Mode_Switch", "スイッチ"},
         {"About_Version", "バージョン %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
 
         // メモリ検索
         {"Mem_Title", "メモリ検索"},
@@ -274,6 +274,19 @@ std::map<std::string, std::string> getLangJA() {
         {"Mem_Tab_Exact", "完全一致"},
         {"Mem_Tab_Fuzzy", "あいまい"},
         {"Mem_Tab_Group", "グループ"},
+
+        {"Timeline_Title", "検索タイムライン"},
+        {"Timeline_Empty", "検索スナップショットなし"},
+        {"Timeline_Clear", "タイムラインをクリア"},
+        {"Timeline_Restored_Fmt", "%@ に復元 · %lu件"},
+        {"Timeline_Restore_Failed", "復元失敗"},
+        {"Timeline_Mode_Exact", "完全検索"},
+        {"Timeline_Mode_Fuzzy", "あいまい検索"},
+        {"Timeline_Mode_Group", "グループ検索"},
+        {"Timeline_Mode_Between", "範囲検索"},
+        {"Undo_Last_Modify", "前回の変更を元に戻す"},
+        {"Undo_Success", "変更を元に戻しました"},
+        {"Undo_Failed", "元に戻せませんでした"},
 
         // メモリ検索追加
         {"Mem_GroupHint", "; または :: で値を区切る"},

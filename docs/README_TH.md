@@ -26,7 +26,7 @@
 ## ขอบเขตปัจจุบัน
 
 - Floating panel และปุ่มเปิดเร็วภายใน process ที่ถูก inject
-- Memory search panel, ผลลัพธ์, memory browser และการแก้ไขค่า
+- Memory search panel, ผลลัพธ์, memory browser, การแก้ไขค่า, การกู้คืนจากไทม์ไลน์ค้นหา และการย้อนกลับการเขียนค่าด้วยมือครั้งล่าสุด
 - Import และจัดเก็บข้อมูล VM/VL `.vm` และ `.vmsc`
 - รายการ pointer ที่ import แล้วสำหรับแสดงค่า เขียนค่า ควบคุมแบบ lock และ UI mode ต่อผลลัพธ์
 - รายการ RVA ที่ import แล้วสำหรับ runtime patch และ restore

@@ -26,7 +26,7 @@
 ## Current Scope
 
 - Floating overlay panel and quick open button inside the injected process.
-- Memory search panel, memory results, memory browsing, and value editing.
+- Memory search panel, memory results, memory browsing, value editing, search timeline restore, and undo for the last manual write.
 - Import and storage for VM/VL `.vm` and `.vmsc` data.
 - Imported pointer items for value display, value write, lock-style controls, and per-result UI modes.
 - Imported RVA items for runtime patch and restore.

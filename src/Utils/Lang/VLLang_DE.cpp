@@ -126,7 +126,7 @@ std::map<std::string, std::string> getLangDE() {
         {"Mode_Slider", "Schieberegler"},
         {"Mode_Switch", "Schalter"},
         {"About_Version", "Version %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "Speichersuche"},
         {"Mem_Debug_Title", "Speicher-Debug"},
         {"Mem_OpenSearch", "Speicher-Debug öffnen"},
@@ -222,6 +222,19 @@ std::map<std::string, std::string> getLangDE() {
         {"Mem_Tab_Exact", "Exakt"},
         {"Mem_Tab_Fuzzy", "Unscharf"},
         {"Mem_Tab_Group", "Gruppe"},
+
+        {"Timeline_Title", "Such-Zeitleiste"},
+        {"Timeline_Empty", "Keine Such-Snapshots"},
+        {"Timeline_Clear", "Zeitleiste leeren"},
+        {"Timeline_Restored_Fmt", "%@ wiederhergestellt · %lu Ergebnisse"},
+        {"Timeline_Restore_Failed", "Wiederherstellung fehlgeschlagen"},
+        {"Timeline_Mode_Exact", "Exakte Suche"},
+        {"Timeline_Mode_Fuzzy", "Fuzzy-Suche"},
+        {"Timeline_Mode_Group", "Gruppensuche"},
+        {"Timeline_Mode_Between", "Bereichssuche"},
+        {"Undo_Last_Modify", "Letzte Änderung rückgängig"},
+        {"Undo_Success", "Änderung rückgängig gemacht"},
+        {"Undo_Failed", "Rückgängig fehlgeschlagen"},
 
         // Speichersuche zusätzlich
         {"Mem_GroupHint", "Verwenden Sie ; oder :: zum Trennen"},

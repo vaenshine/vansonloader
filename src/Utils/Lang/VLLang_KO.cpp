@@ -157,7 +157,7 @@ std::map<std::string, std::string> getLangKO() {
         {"Mode_Slider", "슬라이더"},
         {"Mode_Switch", "스위치"},
         {"About_Version", "버전 %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
 
         // 메모리 검색
         {"Mem_Title", "메모리 검색"},
@@ -274,6 +274,19 @@ std::map<std::string, std::string> getLangKO() {
         {"Mem_Tab_Exact", "정확"},
         {"Mem_Tab_Fuzzy", "퍼지"},
         {"Mem_Tab_Group", "그룹"},
+
+        {"Timeline_Title", "검색 타임라인"},
+        {"Timeline_Empty", "검색 스냅샷 없음"},
+        {"Timeline_Clear", "타임라인 지우기"},
+        {"Timeline_Restored_Fmt", "%@ 복원됨 · %lu개"},
+        {"Timeline_Restore_Failed", "복원 실패"},
+        {"Timeline_Mode_Exact", "정확 검색"},
+        {"Timeline_Mode_Fuzzy", "퍼지 검색"},
+        {"Timeline_Mode_Group", "그룹 검색"},
+        {"Timeline_Mode_Between", "범위 검색"},
+        {"Undo_Last_Modify", "이전 수정 되돌리기"},
+        {"Undo_Success", "수정이 되돌려짐"},
+        {"Undo_Failed", "되돌리기 실패"},
 
         // 메모리 검색 추가
         {"Mem_GroupHint", "; 또는 ::로 값 구분"},

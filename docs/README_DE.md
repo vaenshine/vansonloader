@@ -26,7 +26,7 @@
 ## Aktueller Umfang
 
 - Floating Panel und Schnellöffnungsbutton im injizierten Prozess.
-- Speichersuche, Ergebnisliste, Speicherbrowser und Wertbearbeitung.
+- Speichersuche, Ergebnisliste, Speicherbrowser, Wertbearbeitung, Such-Timeline-Wiederherstellung und Undo für die letzte manuelle Wertänderung.
 - Import und Speicherung von VM/VL `.vm`- und `.vmsc`-Daten.
 - Importierte Pointer-Elemente für Wertanzeige, Wertschreiben, Lock-ähnliche Steuerung und Ergebnis-UI-Modi.
 - Importierte RVA-Elemente für Runtime-Patch und Restore.

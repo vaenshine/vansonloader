@@ -26,7 +26,7 @@
 ## Phạm Vi Hiện Tại
 
 - Bảng nổi và nút mở nhanh trong tiến trình được inject.
-- Bảng tìm kiếm bộ nhớ, kết quả, duyệt bộ nhớ và chỉnh sửa giá trị.
+- Bảng tìm kiếm bộ nhớ, kết quả, duyệt bộ nhớ, chỉnh sửa giá trị, khôi phục từ timeline tìm kiếm và hoàn tác lần ghi thủ công gần nhất.
 - Import và lưu dữ liệu VM/VL `.vm` và `.vmsc`.
 - Mục pointer đã import để hiển thị giá trị, ghi giá trị, điều khiển kiểu lock và chế độ UI theo kết quả.
 - Mục RVA đã import để patch và restore trong runtime.

@@ -404,6 +404,14 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     title.textColor = [UIColor cyanColor];
     title.textAlignment = NSTextAlignmentLeft;
     [_containerView addSubview:title];
+
+    UIButton *timelineBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    timelineBtn.frame = CGRectMake(totalW - 70, y - 2, 28, 28);
+    [timelineBtn setTitle:@"↺" forState:UIControlStateNormal];
+    [timelineBtn setTitleColor:[[UIColor cyanColor] colorWithAlphaComponent:0.7] forState:UIControlStateNormal];
+    timelineBtn.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    [timelineBtn addTarget:self action:@selector(showTimelineSheet) forControlEvents:UIControlEventTouchUpInside];
+    [_containerView addSubview:timelineBtn];
     
     // 最小化按钮 (子窗口只保留最小化，关闭由主窗口控制)
     UIButton *minBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -867,6 +875,84 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     }
 }
 
+- (NSString *)timelineTypeName:(VMemDataType)type {
+    NSArray *names = @[@"I8", @"I16", @"I32", @"I64", @"U8", @"U16", @"U32", @"U64", @"F32", @"F64", @"Str"];
+    if (type < names.count) return names[type];
+    return @"?";
+}
+
+- (NSString *)timelineModeTitle:(VMemSearchMode)mode {
+    switch (mode) {
+        case VMemSearchModeFuzzy: return VL(@"Timeline_Mode_Fuzzy");
+        case VMemSearchModeGroup: return VL(@"Timeline_Mode_Group");
+        case VMemSearchModeBetween: return VL(@"Timeline_Mode_Between");
+        case VMemSearchModeExact:
+        default: return VL(@"Timeline_Mode_Exact");
+    }
+}
+
+- (NSString *)timelineFilterTitle:(VMemFilterMode)mode {
+    switch (mode) {
+        case VMemFilterModeIncreased: return VL(@"Fuz_Increased");
+        case VMemFilterModeDecreased: return VL(@"Fuz_Decreased");
+        case VMemFilterModeUnchanged: return VL(@"Fuz_Unchanged");
+        case VMemFilterModeChanged: return VL(@"Fuz_Changed");
+        case VMemFilterModeLess: return VL(@"Filter_Less");
+        case VMemFilterModeGreater: return VL(@"Filter_Greater");
+        case VMemFilterModeBetween: return VL(@"Filter_Between");
+    }
+}
+
+- (void)captureTimelineTitle:(NSString *)title detail:(NSString *)detail {
+    [[VMemEngine shared] captureTimelineWithTitle:title
+                                           detail:detail
+                                         dataType:g_currentType];
+}
+
+- (void)showTimelineSheet {
+    NSArray<VLMemTimelineItem *> *items = [[VMemEngine shared] timelineItems];
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:VL(@"Timeline_Title")
+                                                                message:items.count > 0 ? nil : VL(@"Timeline_Empty")
+                                                         preferredStyle:UIAlertControllerStyleActionSheet];
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateFormat = @"HH:mm:ss";
+
+    for (NSUInteger i = 0; i < items.count; i++) {
+        VLMemTimelineItem *item = items[i];
+        NSString *time = [fmt stringFromDate:item.date ?: [NSDate date]];
+        NSString *title = [NSString stringWithFormat:@"%@  %@ · %lu",
+                                                     time,
+                                                     item.title ?: @"",
+                                                     (unsigned long)item.resultCount];
+        NSString *detail = item.detail.length > 0 ? item.detail : @"";
+        NSString *actionTitle = detail.length > 0 ? [NSString stringWithFormat:@"%@\n%@", title, detail] : title;
+        [ac addAction:[UIAlertAction actionWithTitle:actionTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            if ([[VMemEngine shared] restoreTimelineAtIndex:i]) {
+                g_currentType = item.dataType;
+                self->_isNextScan = YES;
+                [self loadResults];
+                [self updateUIForMode];
+                [VLMemResults show];
+                [self logConsole:[NSString stringWithFormat:VL(@"Timeline_Restored_Fmt"), time, (unsigned long)item.resultCount]];
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"VLMemResultsDidRestore" object:nil];
+            } else {
+                [self logConsole:VL(@"Timeline_Restore_Failed")];
+            }
+        }]];
+    }
+
+    if (items.count > 0) {
+        [ac addAction:[UIAlertAction actionWithTitle:VL(@"Timeline_Clear") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
+            [[VMemEngine shared] clearTimeline];
+        }]];
+    }
+    [ac addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
+
+    UIViewController *root = GetSafeWindow().rootViewController;
+    while (root.presentedViewController) root = root.presentedViewController;
+    [root presentViewController:ac animated:YES completion:nil];
+}
+
 - (void)doSearch {
     if (g_isSearching) return;
     
@@ -966,6 +1052,8 @@ static VLMemorySearchVC *g_memSearchVC = nil;
                 [self loadResults];
                 // 有结果时自动显示搜索结果窗口
                 if (count > 0) {
+                    NSString *detail = [NSString stringWithFormat:@"%@ %@", [self timelineTypeName:g_currentType], val ?: @""];
+                    [self captureTimelineTitle:[self timelineModeTitle:mode] detail:detail];
                     [VLMemResults show];
                 }
             });
@@ -983,6 +1071,8 @@ static VLMemorySearchVC *g_memSearchVC = nil;
                 [self loadResults];
                 // 有结果时自动显示搜索结果窗口
                 if (count > 0) {
+                    NSString *detail = [NSString stringWithFormat:@"%@ %@", [self timelineTypeName:g_currentType], searchVal ?: @""];
+                    [self captureTimelineTitle:[self timelineModeTitle:mode] detail:detail];
                     [VLMemResults show];
                 }
             });
@@ -1059,6 +1149,8 @@ static VLMemorySearchVC *g_memSearchVC = nil;
             [self loadResults];
             // 有结果时自动显示搜索结果窗口
             if (count > 0) {
+                NSString *detail = [self timelineTypeName:g_currentType];
+                [self captureTimelineTitle:[self timelineFilterTitle:filterMode] detail:detail];
                 [VLMemResults show];
             }
         });

@@ -126,7 +126,7 @@ std::map<std::string, std::string> getLangRU() {
         {"Mode_Slider", "Слайдер"},
         {"Mode_Switch", "Переключатель"},
         {"About_Version", "Версия %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "Поиск памяти"},
         {"Mem_Debug_Title", "Отладка памяти"},
         {"Mem_OpenSearch", "Открыть отладку памяти"},
@@ -222,6 +222,19 @@ std::map<std::string, std::string> getLangRU() {
         {"Mem_Tab_Exact", "Точный"},
         {"Mem_Tab_Fuzzy", "Нечеткий"},
         {"Mem_Tab_Group", "Группа"},
+
+        {"Timeline_Title", "Лента поиска"},
+        {"Timeline_Empty", "Нет снимков поиска"},
+        {"Timeline_Clear", "Очистить ленту"},
+        {"Timeline_Restored_Fmt", "Восстановлено %@ · %lu результатов"},
+        {"Timeline_Restore_Failed", "Ошибка восстановления"},
+        {"Timeline_Mode_Exact", "Точный поиск"},
+        {"Timeline_Mode_Fuzzy", "Нечеткий поиск"},
+        {"Timeline_Mode_Group", "Групповой поиск"},
+        {"Timeline_Mode_Between", "Поиск диапазона"},
+        {"Undo_Last_Modify", "Отменить последнее изменение"},
+        {"Undo_Success", "Изменение отменено"},
+        {"Undo_Failed", "Ошибка отмены"},
 
         // Дополнительно поиск памяти
         {"Mem_GroupHint", "Используйте ; или :: для разделения"},

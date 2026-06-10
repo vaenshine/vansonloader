@@ -126,7 +126,7 @@ std::map<std::string, std::string> getLangFR() {
         {"Mode_Slider", "Curseur"},
         {"Mode_Switch", "Interrupteur"},
         {"About_Version", "Version %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "Recherche mémoire"},
         {"Mem_Debug_Title", "Débogage mémoire"},
         {"Mem_OpenSearch", "Ouvrir débogage mémoire"},
@@ -222,6 +222,19 @@ std::map<std::string, std::string> getLangFR() {
         {"Mem_Tab_Exact", "Exact"},
         {"Mem_Tab_Fuzzy", "Flou"},
         {"Mem_Tab_Group", "Groupe"},
+
+        {"Timeline_Title", "Chronologie de recherche"},
+        {"Timeline_Empty", "Aucun instantane de recherche"},
+        {"Timeline_Clear", "Effacer la chronologie"},
+        {"Timeline_Restored_Fmt", "Restaure %@ · %lu resultats"},
+        {"Timeline_Restore_Failed", "Echec de restauration"},
+        {"Timeline_Mode_Exact", "Recherche exacte"},
+        {"Timeline_Mode_Fuzzy", "Recherche floue"},
+        {"Timeline_Mode_Group", "Recherche groupee"},
+        {"Timeline_Mode_Between", "Recherche par plage"},
+        {"Undo_Last_Modify", "Annuler la derniere modification"},
+        {"Undo_Success", "Modification annulee"},
+        {"Undo_Failed", "Echec de l'annulation"},
 
         // Recherche mémoire supplémentaire
         {"Mem_GroupHint", "Utilisez ; ou :: pour séparer"},

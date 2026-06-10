@@ -26,7 +26,7 @@
 ## Alcance Actual
 
 - Panel flotante y botón de apertura rápida dentro del proceso inyectado.
-- Panel de búsqueda de memoria, resultados, exploración de memoria y edición de valores.
+- Panel de búsqueda de memoria, resultados, exploración de memoria, edición de valores, restauración desde la línea de tiempo y deshacer la última escritura manual.
 - Importación y almacenamiento de datos VM/VL `.vm` y `.vmsc`.
 - Elementos pointer importados para mostrar valores, escribir valores, controles tipo lock y modos UI por resultado.
 - Elementos RVA importados para patch y restore en runtime.

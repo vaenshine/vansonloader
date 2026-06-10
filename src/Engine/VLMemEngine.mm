@@ -11,10 +11,17 @@
 
 @implementation VLMemResultItem
 @end
+@implementation VLMemTimelineItem
+@end
+@implementation VLMemWriteUndoItem
+@end
 
 @interface VLMemEngine () {
     std::unique_ptr<vcore::MemCore> _core;
 }
+@property (nonatomic, copy) NSString *resultFilePath;
+@property (nonatomic, strong) NSMutableArray<VLMemTimelineItem *> *timeline;
+@property (nonatomic, strong) NSMutableArray<VLMemWriteUndoItem *> *manualWriteUndoStack;
 @end
 
 @implementation VLMemEngine
@@ -37,6 +44,9 @@
         NSString *pathA = [tmpDir stringByAppendingPathComponent:@"vmem_scan_a.bin"];
         NSString *pathB = [tmpDir stringByAppendingPathComponent:@"vmem_scan_b.bin"];
         _core->setStoragePath([pathA UTF8String], [pathB UTF8String]);
+        _resultFilePath = [pathA copy];
+        _timeline = [NSMutableArray array];
+        _manualWriteUndoStack = [NSMutableArray array];
         
         _core->setFloatTolerance(0.001);
         _core->setGroupSearchRange(200);
@@ -49,6 +59,8 @@
     if (_core) {
         _core->clearResults();
     }
+    [self clearTimeline];
+    [self clearManualWriteUndo];
     NSString *tmpDir = NSTemporaryDirectory();
     [[NSFileManager defaultManager] removeItemAtPath:[tmpDir stringByAppendingPathComponent:@"vmem_scan_a.bin"] error:nil];
     [[NSFileManager defaultManager] removeItemAtPath:[tmpDir stringByAppendingPathComponent:@"vmem_scan_b.bin"] error:nil];
@@ -304,6 +316,127 @@ static vcore::MemDataType toMemDataType(VMemDataType type) {
 
 - (void)clearResults {
     _core->clearResults();
+    [self clearTimeline];
+    [self clearManualWriteUndo];
+}
+
+- (NSString *)timelineSnapshotPath {
+    NSString *uuid = [[NSUUID UUID] UUIDString];
+    NSString *name = [NSString stringWithFormat:@"vl_timeline_%@.bin", uuid];
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:name];
+}
+
+- (NSArray<VLMemTimelineItem *> *)timelineItems {
+    return [self.timeline copy];
+}
+
+- (void)trimTimelineIfNeeded {
+    const NSUInteger maxItems = 20;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    while (self.timeline.count > maxItems) {
+        VLMemTimelineItem *old = self.timeline.lastObject;
+        if (old.filePath.length > 0) {
+            [fm removeItemAtPath:old.filePath error:nil];
+        }
+        [self.timeline removeLastObject];
+    }
+}
+
+- (void)captureTimelineWithTitle:(NSString *)title
+                           detail:(NSString *)detail
+                         dataType:(VMemDataType)type {
+    if (self.resultCount == 0 || self.resultFilePath.length == 0) return;
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm fileExistsAtPath:self.resultFilePath]) return;
+
+    NSString *snapPath = [self timelineSnapshotPath];
+    if (![fm copyItemAtPath:self.resultFilePath toPath:snapPath error:nil]) return;
+
+    VLMemTimelineItem *item = [VLMemTimelineItem new];
+    item.title = title ?: @"";
+    item.detail = detail ?: @"";
+    item.filePath = snapPath;
+    item.resultCount = self.resultCount;
+    item.dataType = type;
+    item.date = [NSDate date];
+    [self.timeline insertObject:item atIndex:0];
+    [self trimTimelineIfNeeded];
+}
+
+- (BOOL)restoreTimelineAtIndex:(NSUInteger)index {
+    if (index >= self.timeline.count) return NO;
+    VLMemTimelineItem *item = self.timeline[index];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (item.filePath.length == 0 || ![fm fileExistsAtPath:item.filePath]) return NO;
+
+    NSString *copyPath = [self timelineSnapshotPath];
+    if (![fm copyItemAtPath:item.filePath toPath:copyPath error:nil]) return NO;
+
+    BOOL ok = _core->restoreResultsFromFile([copyPath UTF8String], item.resultCount);
+    if (!ok) [fm removeItemAtPath:copyPath error:nil];
+    return ok;
+}
+
+- (void)removeTimelineAtIndex:(NSUInteger)index {
+    if (index >= self.timeline.count) return;
+    VLMemTimelineItem *item = self.timeline[index];
+    if (item.filePath.length > 0) {
+        [[NSFileManager defaultManager] removeItemAtPath:item.filePath error:nil];
+    }
+    [self.timeline removeObjectAtIndex:index];
+}
+
+- (void)clearTimeline {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    for (VLMemTimelineItem *item in self.timeline) {
+        if (item.filePath.length > 0) {
+            [fm removeItemAtPath:item.filePath error:nil];
+        }
+    }
+    [self.timeline removeAllObjects];
+}
+
+- (void)rememberManualWriteUndoAtAddress:(uint64_t)address
+                                    type:(VMemDataType)type
+                                oldValue:(NSString *)oldValue
+                                 oldData:(NSData *)oldData
+                                newValue:(NSString *)newValue {
+    if (!oldData || oldData.length == 0) return;
+
+    VLMemWriteUndoItem *item = [VLMemWriteUndoItem new];
+    item.address = address;
+    item.type = type;
+    item.oldValue = oldValue ?: @"";
+    item.writtenValue = newValue ?: @"";
+    item.oldData = oldData;
+    item.date = [NSDate date];
+    [self.manualWriteUndoStack insertObject:item atIndex:0];
+
+    const NSUInteger maxItems = 30;
+    while (self.manualWriteUndoStack.count > maxItems) {
+        [self.manualWriteUndoStack removeLastObject];
+    }
+}
+
+- (VLMemWriteUndoItem *)lastManualWriteUndoForAddress:(uint64_t)address
+                                                 type:(VMemDataType)type {
+    for (VLMemWriteUndoItem *item in self.manualWriteUndoStack) {
+        if (item.address == address && item.type == type) return item;
+    }
+    return nil;
+}
+
+- (BOOL)undoLastManualWriteForAddress:(uint64_t)address type:(VMemDataType)type {
+    VLMemWriteUndoItem *item = [self lastManualWriteUndoForAddress:address type:type];
+    if (!item) return NO;
+    BOOL ok = [self writeMemory:address data:item.oldData];
+    if (ok) [self.manualWriteUndoStack removeObject:item];
+    return ok;
+}
+
+- (void)clearManualWriteUndo {
+    [self.manualWriteUndoStack removeAllObjects];
 }
 
 - (void)batchModifyWithValue:(NSString *)value

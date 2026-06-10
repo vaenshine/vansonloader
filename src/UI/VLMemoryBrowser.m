@@ -1164,9 +1164,29 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     }];
     
     [ac addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
+    VLMemWriteUndoItem *undo = [[VLMemEngine shared] lastManualWriteUndoForAddress:addr type:type];
+    if (undo) {
+        NSString *undoTitle = [NSString stringWithFormat:@"%@: %@", VL(@"Undo_Last_Modify"), undo.oldValue ?: @""];
+        [ac addAction:[UIAlertAction actionWithTitle:undoTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            BOOL ok = [[VLMemEngine shared] undoLastManualWriteForAddress:addr type:type];
+            if (ok) {
+                [self refreshCurrentData];
+                showToast(VL(@"Undo_Success"));
+            } else {
+                showToast(VL(@"Undo_Failed"));
+            }
+        }]];
+    }
     [ac addAction:[UIAlertAction actionWithTitle:VL(@"Mem_Write") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
         NSString *newVal = ac.textFields.firstObject.text;
         if (newVal.length > 0) {
+            NSString *oldVal = [[VLMemEngine shared] readAddress:addr type:type];
+            NSData *oldData = [[VLMemEngine shared] readMemory:addr length:[self writeSizeForType:type oldValue:oldVal newValue:newVal]];
+            [[VLMemEngine shared] rememberManualWriteUndoAtAddress:addr
+                                                             type:type
+                                                         oldValue:oldVal
+                                                          oldData:oldData
+                                                         newValue:newVal];
             [[VLMemEngine shared] writeAddress:addr value:newVal type:type];
             [self refreshCurrentData];
             showToast(VL(@"Mem_WriteOK"));
@@ -1176,6 +1196,31 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     UIViewController *root = GetSafeWindow().rootViewController;
     while (root.presentedViewController) root = root.presentedViewController;
     [root presentViewController:ac animated:YES completion:nil];
+}
+
+- (NSUInteger)writeSizeForType:(VMemDataType)type oldValue:(NSString *)oldValue newValue:(NSString *)newValue {
+    switch (type) {
+        case VMemDataTypeI8:
+        case VMemDataTypeU8:
+            return 1;
+        case VMemDataTypeI16:
+        case VMemDataTypeU16:
+            return 2;
+        case VMemDataTypeI64:
+        case VMemDataTypeU64:
+        case VMemDataTypeF64:
+            return 8;
+        case VMemDataTypeString: {
+            NSUInteger oldLen = [oldValue lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+            NSUInteger newLen = [newValue lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+            return MAX((NSUInteger)1, MAX(oldLen, newLen));
+        }
+        case VMemDataTypeI32:
+        case VMemDataTypeU32:
+        case VMemDataTypeF32:
+        default:
+            return 4;
+    }
 }
 
 - (void)showStrEditAlert:(NSMutableDictionary *)item indexPath:(NSIndexPath *)indexPath {
@@ -1191,6 +1236,20 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     }];
     
     __weak typeof(self) weakSelf = self;
+    VLMemWriteUndoItem *undo = [[VLMemEngine shared] lastManualWriteUndoForAddress:addr type:VMemDataTypeString];
+    if (undo) {
+        NSString *undoTitle = [NSString stringWithFormat:@"%@: %@", VL(@"Undo_Last_Modify"), undo.oldValue ?: @""];
+        [alert addAction:[UIAlertAction actionWithTitle:undoTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            BOOL ok = [[VLMemEngine shared] undoLastManualWriteForAddress:addr type:VMemDataTypeString];
+            if (ok) {
+                item[@"value"] = undo.oldValue ?: @"";
+                [weakSelf refreshCurrentData];
+                showToast(VL(@"Undo_Success"));
+            } else {
+                showToast(VL(@"Undo_Failed"));
+            }
+        }]];
+    }
     [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Confirm") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
         NSString *newVal = alert.textFields.firstObject.text ?: @"";
         NSUInteger newLen = [newVal lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
@@ -1220,6 +1279,14 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     uint64_t addr = [item[@"addr"] unsignedLongLongValue];
     const char *cstr = [newVal UTF8String];
     NSUInteger writeLen = strlen(cstr) + 1;
+    NSString *oldVal = item[@"value"] ?: @"";
+    NSUInteger oldSize = MAX([[oldVal dataUsingEncoding:NSUTF8StringEncoding] length] + 1, writeLen);
+    NSData *oldData = [[VLMemEngine shared] readMemory:addr length:oldSize];
+    [[VLMemEngine shared] rememberManualWriteUndoAtAddress:addr
+                                                     type:VMemDataTypeString
+                                                 oldValue:oldVal
+                                                  oldData:oldData
+                                                 newValue:newVal];
     NSData *data = [NSData dataWithBytes:cstr length:writeLen];
     [[VLMemEngine shared] writeMemory:addr data:data];
     

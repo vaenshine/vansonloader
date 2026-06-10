@@ -157,7 +157,7 @@ std::map<std::string, std::string> getLangTW() {
         {"Mode_Slider", "滑塊"},
         {"Mode_Switch", "開關"},
         {"About_Version", "版本 %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: 搜尋時間線、結果恢復、寫入撤回\nOpen Source: GPL-3.0"},
 
         // 記憶體搜尋
         {"Mem_Title", "記憶體搜尋"},
@@ -274,6 +274,19 @@ std::map<std::string, std::string> getLangTW() {
         {"Mem_Tab_Exact", "精確"},
         {"Mem_Tab_Fuzzy", "模糊"},
         {"Mem_Tab_Group", "聯合"},
+
+        {"Timeline_Title", "搜尋時間線"},
+        {"Timeline_Empty", "暫無搜尋快照"},
+        {"Timeline_Clear", "清空時間線"},
+        {"Timeline_Restored_Fmt", "已恢復 %@ · %lu 筆"},
+        {"Timeline_Restore_Failed", "恢復失敗"},
+        {"Timeline_Mode_Exact", "精確搜尋"},
+        {"Timeline_Mode_Fuzzy", "模糊搜尋"},
+        {"Timeline_Mode_Group", "聯合搜尋"},
+        {"Timeline_Mode_Between", "範圍搜尋"},
+        {"Undo_Last_Modify", "撤回上次修改"},
+        {"Undo_Success", "已撤回修改"},
+        {"Undo_Failed", "撤回失敗"},
 
         // 記憶體搜尋附加
         {"Mem_GroupHint", "使用 ; 或 :: 分隔多個值"},

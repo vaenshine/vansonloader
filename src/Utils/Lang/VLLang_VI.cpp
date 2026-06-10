@@ -126,7 +126,7 @@ std::map<std::string, std::string> getLangVI() {
         {"Mode_Slider", "Thanh trượt"},
         {"Mode_Switch", "Công tắc"},
         {"About_Version", "Phiên bản %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "Tìm kiếm bộ nhớ"},
         {"Mem_Debug_Title", "Gỡ lỗi bộ nhớ"},
         {"Mem_OpenSearch", "Mở gỡ lỗi bộ nhớ"},
@@ -222,6 +222,19 @@ std::map<std::string, std::string> getLangVI() {
         {"Mem_Tab_Exact", "Chính xác"},
         {"Mem_Tab_Fuzzy", "Mờ"},
         {"Mem_Tab_Group", "Nhóm"},
+
+        {"Timeline_Title", "Dong thoi gian tim kiem"},
+        {"Timeline_Empty", "Chua co ban chup tim kiem"},
+        {"Timeline_Clear", "Xoa dong thoi gian"},
+        {"Timeline_Restored_Fmt", "Da khoi phuc %@ · %lu ket qua"},
+        {"Timeline_Restore_Failed", "Khoi phuc that bai"},
+        {"Timeline_Mode_Exact", "Tim chinh xac"},
+        {"Timeline_Mode_Fuzzy", "Tim mo"},
+        {"Timeline_Mode_Group", "Tim nhom"},
+        {"Timeline_Mode_Between", "Tim theo khoang"},
+        {"Undo_Last_Modify", "Hoan tac lan sua truoc"},
+        {"Undo_Success", "Da hoan tac sua doi"},
+        {"Undo_Failed", "Hoan tac that bai"},
 
         // Tìm kiếm bộ nhớ bổ sung
         {"Mem_GroupHint", "Dùng ; hoặc :: để phân tách"},

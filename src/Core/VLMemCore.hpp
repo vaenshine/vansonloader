@@ -72,6 +72,7 @@ public:
     bool getGroupAnchorMode() const { return _groupAnchorMode; }
     
     void setStoragePath(const std::string& path, const std::string& swapPath);
+    bool restoreResultsFromFile(const std::string& filePath, size_t resultCount);
     
     // ========== 特征码搜索 ==========
     SignatureData parseSignature(const std::string& sig);

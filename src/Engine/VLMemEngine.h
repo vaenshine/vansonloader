@@ -53,6 +53,24 @@ typedef NS_ENUM(NSUInteger, VMemFilterMode) {
 @property (nonatomic, strong, nullable) NSNumber *prevValue;
 @end
 
+@interface VLMemTimelineItem : NSObject
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy) NSString *detail;
+@property (nonatomic, copy) NSString *filePath;
+@property (nonatomic, strong) NSDate *date;
+@property (nonatomic, assign) NSUInteger resultCount;
+@property (nonatomic, assign) VMemDataType dataType;
+@end
+
+@interface VLMemWriteUndoItem : NSObject
+@property (nonatomic, assign) uint64_t address;
+@property (nonatomic, assign) VMemDataType type;
+@property (nonatomic, copy) NSString *oldValue;
+@property (nonatomic, copy) NSString *writtenValue;
+@property (nonatomic, strong) NSData *oldData;
+@property (nonatomic, strong) NSDate *date;
+@end
+
 // Backward compatibility
 typedef VLMemResultItem VMemResultItem;
 
@@ -111,6 +129,24 @@ typedef VLMemResultItem VMemResultItem;
 - (nullable VLMemResultItem *)getResultAtIndex:(NSUInteger)index type:(VMemDataType)type;
 - (void)removeResultAtIndex:(NSUInteger)index;
 - (void)clearResults;
+
+- (NSArray<VLMemTimelineItem *> *)timelineItems;
+- (void)captureTimelineWithTitle:(NSString *)title
+                           detail:(NSString *)detail
+                         dataType:(VMemDataType)type;
+- (BOOL)restoreTimelineAtIndex:(NSUInteger)index;
+- (void)removeTimelineAtIndex:(NSUInteger)index;
+- (void)clearTimeline;
+
+- (void)rememberManualWriteUndoAtAddress:(uint64_t)address
+                                    type:(VMemDataType)type
+                                oldValue:(NSString *)oldValue
+                                 oldData:(NSData *)oldData
+                                newValue:(NSString *)newValue;
+- (nullable VLMemWriteUndoItem *)lastManualWriteUndoForAddress:(uint64_t)address
+                                                          type:(VMemDataType)type;
+- (BOOL)undoLastManualWriteForAddress:(uint64_t)address type:(VMemDataType)type;
+- (void)clearManualWriteUndo;
 
 - (void)batchModifyWithValue:(NSString *)value
                        limit:(NSInteger)limit

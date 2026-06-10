@@ -303,6 +303,20 @@ void MemCore::setStoragePath(const std::string& path, const std::string& swapPat
     _fastFuzzySnapshotPath = path + ".fuzzy";
 }
 
+bool MemCore::restoreResultsFromFile(const std::string& filePath, size_t resultCount) {
+    if (_storagePath.empty()) return false;
+
+    ::remove(_storagePath.c_str());
+    if (filePath.empty() || resultCount == 0) {
+        _resultCount = 0;
+        return true;
+    }
+
+    if (::rename(filePath.c_str(), _storagePath.c_str()) != 0) return false;
+    _resultCount = resultCount;
+    return true;
+}
+
 
 // ============================================================================
 // 首次搜索

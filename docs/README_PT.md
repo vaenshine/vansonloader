@@ -26,7 +26,7 @@
 ## Escopo Atual
 
 - Painel flutuante e botão de abertura rápida dentro do processo injetado.
-- Busca de memória, resultados, navegação de memória e edição de valores.
+- Busca de memória, resultados, navegação de memória, edição de valores, restauração pela linha do tempo e desfazer a última escrita manual.
 - Importação e armazenamento de dados VM/VL `.vm` e `.vmsc`.
 - Itens pointer importados para exibição de valor, escrita de valor, controles tipo lock e modos de UI por resultado.
 - Itens RVA importados para patch e restore em runtime.

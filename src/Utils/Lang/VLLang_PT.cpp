@@ -127,7 +127,7 @@ std::map<std::string, std::string> getLangPT() {
         {"Mode_Slider", "Slider"},
         {"Mode_Switch", "Switch"},
         {"About_Version", "Versão %@"},
-        {"About_License", "Open Source: GPL-3.0"},
+        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
         {"Mem_Title", "Busca de memória"},
         {"Mem_Debug_Title", "Depuração de memória"},
         {"Mem_OpenSearch", "Abrir depuração de memória"},
@@ -223,6 +223,19 @@ std::map<std::string, std::string> getLangPT() {
         {"Mem_Tab_Exact", "Exato"},
         {"Mem_Tab_Fuzzy", "Difuso"},
         {"Mem_Tab_Group", "Grupo"},
+
+        {"Timeline_Title", "Linha do tempo da busca"},
+        {"Timeline_Empty", "Sem instantaneos de busca"},
+        {"Timeline_Clear", "Limpar linha do tempo"},
+        {"Timeline_Restored_Fmt", "Restaurado %@ · %lu resultados"},
+        {"Timeline_Restore_Failed", "Falha ao restaurar"},
+        {"Timeline_Mode_Exact", "Busca exata"},
+        {"Timeline_Mode_Fuzzy", "Busca difusa"},
+        {"Timeline_Mode_Group", "Busca em grupo"},
+        {"Timeline_Mode_Between", "Busca por faixa"},
+        {"Undo_Last_Modify", "Desfazer ultima modificacao"},
+        {"Undo_Success", "Modificacao desfeita"},
+        {"Undo_Failed", "Falha ao desfazer"},
 
         // Busca de memória adicional
         {"Mem_GroupHint", "Use ; ou :: para separar valores"},

@@ -17,6 +17,40 @@ static VMemDataType VLNearbyTypeForSelection(NSInteger index) {
     }
 }
 
+static NSString *VLPanelTimelineTypeName(VMemDataType type) {
+    NSArray *names = @[@"I8", @"I16", @"I32", @"I64", @"U8", @"U16", @"U32", @"U64", @"F32", @"F64", @"Str"];
+    if (type < names.count) return names[type];
+    return @"?";
+}
+
+static NSString *VLPanelTimelineModeTitle(VMemSearchMode mode) {
+    switch (mode) {
+        case VMemSearchModeFuzzy: return VL(@"Timeline_Mode_Fuzzy");
+        case VMemSearchModeGroup: return VL(@"Timeline_Mode_Group");
+        case VMemSearchModeBetween: return VL(@"Timeline_Mode_Between");
+        case VMemSearchModeExact:
+        default: return VL(@"Timeline_Mode_Exact");
+    }
+}
+
+static NSString *VLPanelTimelineFilterTitle(VMemFilterMode mode) {
+    switch (mode) {
+        case VMemFilterModeGreater: return VL(@"Fuz_Increased");
+        case VMemFilterModeLess: return VL(@"Fuz_Decreased");
+        case VMemFilterModeChanged: return VL(@"Fuz_Changed");
+        case VMemFilterModeUnchanged: return VL(@"Fuz_Unchanged");
+        case VMemFilterModeIncreased: return VL(@"Fuz_Increased");
+        case VMemFilterModeDecreased: return VL(@"Fuz_Decreased");
+        case VMemFilterModeBetween: return VL(@"Timeline_Mode_Between");
+    }
+}
+
+static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataType type) {
+    [[VMemEngine shared] captureTimelineWithTitle:title ?: @""
+                                           detail:detail ?: @""
+                                         dataType:type];
+}
+
 @implementation VPanelImpl (Memory)
 
 #pragma mark - Memory Page Setup (双栏)
@@ -460,6 +494,10 @@ static VMemDataType VLNearbyTypeForSelection(NSInteger index) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 self.memIsSearching = NO;
                 self.memConsoleLabel.text = [NSString stringWithFormat:@"%@ %lu", VL(@"Mem_Found"), (unsigned long)count];
+                if (count > 0) {
+                    NSString *detail = [NSString stringWithFormat:@"%@ %@", VLPanelTimelineTypeName(g_currentType), val ?: @""];
+                    VLPanelCaptureTimeline(VLPanelTimelineModeTitle(mode), detail, g_currentType);
+                }
                 [self refreshMemResults];
                 [self feedbackForSuccess:(count > 0)];
             });
@@ -472,6 +510,10 @@ static VMemDataType VLNearbyTypeForSelection(NSInteger index) {
                 self.memIsNextScan = YES;
                 self.memIsFirstSearch = NO;
                 self.memConsoleLabel.text = [NSString stringWithFormat:@"%@ %lu", VL(@"Mem_Found"), (unsigned long)count];
+                if (count > 0) {
+                    NSString *detail = [NSString stringWithFormat:@"%@ %@", VLPanelTimelineTypeName(g_currentType), searchVal ?: @""];
+                    VLPanelCaptureTimeline(VLPanelTimelineModeTitle(mode), detail, g_currentType);
+                }
                 [self updateMemUIForMode];
                 [self refreshMemResults];
                 [self feedbackForSuccess:(count > 0)];
@@ -523,6 +565,9 @@ static VMemDataType VLNearbyTypeForSelection(NSInteger index) {
             self.memIsSearching = NO;
             self.memIsFirstSearch = NO;
             self.memConsoleLabel.text = [NSString stringWithFormat:@"%@ %lu", VL(@"Mem_Found"), (unsigned long)count];
+            if (count > 0) {
+                VLPanelCaptureTimeline(VLPanelTimelineFilterTitle(filterMode), VLPanelTimelineTypeName(g_currentType), g_currentType);
+            }
             [self updateMemUIForMode];
             [self refreshMemResults];
             [self feedbackForSuccess:(count > 0)];
@@ -560,6 +605,10 @@ static VMemDataType VLNearbyTypeForSelection(NSInteger index) {
             self.memConsoleLabel.text = [NSString stringWithFormat:@"%@ %lu", VL(@"Mem_Found"), (unsigned long)count];
             self.memIsNextScan = YES;
             self.memIsFirstSearch = NO;
+            if (count > 0) {
+                NSString *detail = [NSString stringWithFormat:@"%@ %@ ±%llu", VLPanelTimelineTypeName(g_currentType), val ?: @"", range];
+                VLPanelCaptureTimeline(VL(@"Nearby_Btn"), detail, g_currentType);
+            }
             [self updateMemUIForMode];
             [self refreshMemResults];
             [self feedbackForSuccess:(count > 0)];
