@@ -619,6 +619,9 @@ static vcore::MemDataType toMemDataType(VMemDataType type) {
         
         self->_core->fastFuzzyFilter(coreType, filterMode, 0, 0);
         NSUInteger count = self->_core->getResultCount();
+        NSString *tmpDir = NSTemporaryDirectory();
+        self.resultFilePath =
+            count > 0 ? [tmpDir stringByAppendingPathComponent:@"vmem_scan_a.bin"] : nil;
         
         dispatch_async(dispatch_get_main_queue(), ^{
             if (completion) {
