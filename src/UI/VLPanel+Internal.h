@@ -173,6 +173,9 @@ static inline UIColor *VLStrokeColor(void) {
 
 // ═══ 工具Tab ═══
 @property (nonatomic, strong) UIScrollView *toolsScroll;
+@property (nonatomic, strong) UITextField *groupRangeField;
+@property (nonatomic, strong) UITextField *floatToleranceField;
+@property (nonatomic, strong) UISegmentedControl *groupModeSeg;
 
 // ═══ 关于Tab ═══
 @property (nonatomic, strong) UIScrollView *aboutScroll;
@@ -224,6 +227,7 @@ static inline UIColor *VLStrokeColor(void) {
 
 // ═══ UI Helpers (VLPanel.m 主实现) ═══
 - (void)styleSegment:(UISegmentedControl *)seg;
+- (void)styleSettingField:(UITextField *)field;
 - (UIView *)createBox:(NSString *)title x:(CGFloat)x y:(CGFloat)y w:(CGFloat)w;
 - (UIButton *)createSmallBtn:(NSString *)title frame:(CGRect)frame;
 - (void)addDoneButtonTo:(UITextField *)tf;

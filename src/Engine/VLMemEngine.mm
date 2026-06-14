@@ -9,6 +9,36 @@
 #include <memory>
 #include <cmath>
 
+static uint64_t VLParseUnsignedSetting(NSString *text, uint64_t fallback) {
+    NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) return fallback;
+
+    const char *cstr = [trimmed UTF8String];
+    char *end = nullptr;
+    unsigned long long parsed = strtoull(cstr, &end, 0);
+    if (end == cstr) return fallback;
+    return (uint64_t)parsed;
+}
+
+static NSString *VLNormalizedGroupRangeText(NSString *text) {
+    NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0 || [trimmed isEqualToString:@"100"] || [trimmed isEqualToString:@"200"]) {
+        return @"0x100";
+    }
+    return trimmed;
+}
+
+static double VLParseDoubleSetting(NSString *text, double fallback) {
+    NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) return fallback;
+
+    const char *cstr = [trimmed UTF8String];
+    char *end = nullptr;
+    double parsed = strtod(cstr, &end);
+    if (end == cstr) return fallback;
+    return parsed;
+}
+
 @implementation VLMemResultItem
 @end
 @implementation VLMemTimelineItem
@@ -48,9 +78,21 @@
         _timeline = [NSMutableArray array];
         _manualWriteUndoStack = [NSMutableArray array];
         
-        _core->setFloatTolerance(0.001);
-        _core->setGroupSearchRange(200);
-        _core->setGroupAnchorMode(false);
+        NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+
+        NSString *toleranceText = [def objectForKey:@"floatTolerance"];
+        _floatTolerance = VLParseDoubleSetting(toleranceText ?: @"0.001", 0.001);
+        _core->setFloatTolerance(_floatTolerance);
+
+        NSString *groupRangeText = VLNormalizedGroupRangeText([def objectForKey:@"groupRange"] ?: @"");
+        [def setObject:groupRangeText forKey:@"groupRange"];
+        _groupSearchRange = VLParseUnsignedSetting(groupRangeText, 0x100);
+        _core->setGroupSearchRange(_groupSearchRange);
+
+        id anchorObj = [def objectForKey:@"groupAnchorMode"];
+        _groupAnchorMode = anchorObj ? [def boolForKey:@"groupAnchorMode"] : NO;
+        _core->setGroupAnchorMode(_groupAnchorMode);
+
     }
     return self;
 }

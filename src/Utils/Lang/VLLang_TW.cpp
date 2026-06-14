@@ -46,6 +46,14 @@ std::map<std::string, std::string> getLangTW() {
         {"Tool_Clicker", "連點器"},
         {"Tool_Dump", "資料匯出"},
         {"Tool_Config", "配置管理"},
+        {"Tool_SearchSettings", "記憶體搜尋設定"},
+        {"Set_Group_Range", "聯合範圍±"},
+        {"Set_Group_Range_Placeholder", "範圍 (0x100 = 256)"},
+        {"Set_Group_Mode", "聯合模式"},
+        {"Group_Anchor", "錨點"},
+        {"Group_Order", "順序"},
+        {"Set_Float_Tol", "浮點數誤差"},
+        {"Set_Float_Tol_Placeholder", "例如 0.001"},
 
         // 空狀態
         {"Empty_Ptr", "暫無指標配置"},
@@ -157,7 +165,7 @@ std::map<std::string, std::string> getLangTW() {
         {"Mode_Slider", "滑塊"},
         {"Mode_Switch", "開關"},
         {"About_Version", "版本 %@"},
-        {"About_License", "v3.1: 搜尋時間線、結果恢復、寫入撤回\nOpen Source: GPL-3.0"},
+        {"About_License", "Open Source: GPL-3.0"},
 
         // 記憶體搜尋
         {"Mem_Title", "記憶體搜尋"},

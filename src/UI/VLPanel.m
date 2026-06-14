@@ -11,9 +11,32 @@
 
 #import "VLPanel+Internal.h"
 #import "VLPanelSizeHelper.h"
+#import <stdlib.h>
 
 // ═══ 全局实例 & 常量 ═══
 VPanelImpl *g_panel = nil;
+
+static uint64_t VLPanelParseUnsignedSetting(NSString *text, uint64_t fallback) {
+    NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) return fallback;
+
+    const char *cstr = [trimmed UTF8String];
+    char *end = NULL;
+    unsigned long long parsed = strtoull(cstr, &end, 0);
+    if (end == cstr) return fallback;
+    return (uint64_t)parsed;
+}
+
+static double VLPanelParseDoubleSetting(NSString *text, double fallback) {
+    NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) return fallback;
+
+    const char *cstr = [trimmed UTF8String];
+    char *end = NULL;
+    double parsed = strtod(cstr, &end);
+    if (end == cstr) return fallback;
+    return parsed;
+}
 
 // ═══ VLPanelMemItem 实现 ═══
 @implementation VLPanelMemItem
@@ -237,6 +260,67 @@ VPanelImpl *g_panel = nil;
 
     [_toolsScroll addSubview:clickBox];
     y += clickH + gap;
+
+    // ═══ 内存搜索设置 ═══
+    CGFloat settingCellH = 54;
+    CGFloat searchSettingsH = titleH + innerPad + settingCellH * 2 + rowGap + innerPad;
+    UIView *searchBox = [self createBox:VL(@"Tool_SearchSettings") x:pad y:y w:colW];
+    searchBox.frame = CGRectMake(pad, y, colW, searchSettingsH);
+
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+    CGFloat cellGap = 8;
+    CGFloat cellW = floor((colW - innerPad * 2 - cellGap) / 2.0);
+    CGFloat leftX = innerPad;
+    CGFloat settingsRightX = innerPad + cellW + cellGap;
+    CGFloat topY = row1Y;
+    CGFloat bottomY = row1Y + settingCellH + rowGap;
+
+    void (^addSettingLabel)(NSString *, CGRect) = ^(NSString *title, CGRect frame) {
+        UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(frame.origin.x, frame.origin.y, frame.size.width, 16)];
+        label.text = title;
+        label.textColor = [VLAccentColor() colorWithAlphaComponent:0.58];
+        label.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
+        label.adjustsFontSizeToFitWidth = YES;
+        label.minimumScaleFactor = 0.7;
+        [searchBox addSubview:label];
+    };
+
+    CGRect rangeFrame = CGRectMake(leftX, topY, cellW, settingCellH);
+    addSettingLabel(VL(@"Set_Group_Range"), rangeFrame);
+    _groupRangeField = [[UITextField alloc] initWithFrame:CGRectMake(rangeFrame.origin.x, rangeFrame.origin.y + 20, rangeFrame.size.width, btnH)];
+    _groupRangeField.text = [def objectForKey:@"groupRange"] ?: @"0x100";
+    _groupRangeField.placeholder = VL(@"Set_Group_Range_Placeholder");
+    _groupRangeField.keyboardType = UIKeyboardTypeNumbersAndPunctuation;
+    _groupRangeField.returnKeyType = UIReturnKeyDone;
+    _groupRangeField.delegate = self;
+    [_groupRangeField addTarget:self action:@selector(onMemorySettingFieldDidEnd:) forControlEvents:UIControlEventEditingDidEnd];
+    [self styleSettingField:_groupRangeField];
+    [searchBox addSubview:_groupRangeField];
+
+    CGRect modeFrame = CGRectMake(settingsRightX, topY, cellW, settingCellH);
+    addSettingLabel(VL(@"Set_Group_Mode"), modeFrame);
+    _groupModeSeg = [[UISegmentedControl alloc] initWithItems:@[VL(@"Group_Anchor"), VL(@"Group_Order")]];
+    _groupModeSeg.frame = CGRectMake(modeFrame.origin.x, modeFrame.origin.y + 20, modeFrame.size.width, btnH);
+    BOOL anchorMode = [def objectForKey:@"groupAnchorMode"] ? [def boolForKey:@"groupAnchorMode"] : NO;
+    _groupModeSeg.selectedSegmentIndex = anchorMode ? 0 : 1;
+    [self styleSegment:_groupModeSeg];
+    [_groupModeSeg addTarget:self action:@selector(onGroupModeChanged:) forControlEvents:UIControlEventValueChanged];
+    [searchBox addSubview:_groupModeSeg];
+
+    CGRect toleranceFrame = CGRectMake(leftX, bottomY, cellW, settingCellH);
+    addSettingLabel(VL(@"Set_Float_Tol"), toleranceFrame);
+    _floatToleranceField = [[UITextField alloc] initWithFrame:CGRectMake(toleranceFrame.origin.x, toleranceFrame.origin.y + 20, toleranceFrame.size.width, btnH)];
+    _floatToleranceField.text = [def objectForKey:@"floatTolerance"] ?: @"0.001";
+    _floatToleranceField.placeholder = VL(@"Set_Float_Tol_Placeholder");
+    _floatToleranceField.keyboardType = UIKeyboardTypeDecimalPad;
+    _floatToleranceField.returnKeyType = UIReturnKeyDone;
+    _floatToleranceField.delegate = self;
+    [_floatToleranceField addTarget:self action:@selector(onMemorySettingFieldDidEnd:) forControlEvents:UIControlEventEditingDidEnd];
+    [self styleSettingField:_floatToleranceField];
+    [searchBox addSubview:_floatToleranceField];
+
+    [_toolsScroll addSubview:searchBox];
+    y += searchSettingsH + gap;
 
     // ═══ 配置管理 + Dump ═══
     CGFloat halfCol = (colW - gap) / 2;
@@ -616,6 +700,39 @@ VPanelImpl *g_panel = nil;
     [VLTools onTouchModeToggle:toggle];
 }
 
+- (void)onGroupModeChanged:(UISegmentedControl *)seg {
+    BOOL anchorMode = (seg.selectedSegmentIndex == 0);
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+    [def setBool:anchorMode forKey:@"groupAnchorMode"];
+    [def synchronize];
+    [VMemEngine shared].groupAnchorMode = anchorMode;
+    showToast(VL(@"Msg_Saved"));
+}
+
+- (void)onMemorySettingFieldDidEnd:(UITextField *)field {
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+
+    if (field == _groupRangeField) {
+        NSString *trimmed = [field.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        uint64_t range = VLPanelParseUnsignedSetting(trimmed, 0x100);
+        if ([trimmed hasPrefix:@"0x"] || [trimmed hasPrefix:@"0X"] || range == 0x100) {
+            field.text = [NSString stringWithFormat:@"0x%llX", (unsigned long long)range];
+        } else {
+            field.text = [NSString stringWithFormat:@"%llu", (unsigned long long)range];
+        }
+        [def setObject:field.text forKey:@"groupRange"];
+        [VMemEngine shared].groupSearchRange = range;
+    } else if (field == _floatToleranceField) {
+        double tolerance = VLPanelParseDoubleSetting(field.text, 0.001);
+        field.text = [NSString stringWithFormat:@"%g", tolerance];
+        [def setObject:field.text forKey:@"floatTolerance"];
+        [VMemEngine shared].floatTolerance = tolerance;
+    }
+
+    [def synchronize];
+    showToast(VL(@"Msg_Saved"));
+}
+
 - (void)onOpenFileBrowser {
     UIWindow *w = GetSafeWindow();
     if (w) [VLFileBrowserVC showFromWindow:w];
@@ -877,6 +994,17 @@ VPanelImpl *g_panel = nil;
                                NSFontAttributeName: [UIFont fontWithName:@"Menlo-Bold" size:9]};
     [seg setTitleTextAttributes:normalAttr forState:UIControlStateNormal];
     [seg setTitleTextAttributes:selAttr forState:UIControlStateSelected];
+}
+
+- (void)styleSettingField:(UITextField *)field {
+    field.textColor = VLAccentColor();
+    field.font = [UIFont fontWithName:@"Menlo" size:11];
+    field.layer.borderColor = [VLAccentColor() colorWithAlphaComponent:0.24].CGColor;
+    field.layer.borderWidth = 1;
+    field.layer.cornerRadius = 6;
+    field.backgroundColor = [VLAccentColor() colorWithAlphaComponent:0.05];
+    field.textAlignment = NSTextAlignmentCenter;
+    [self addDoneButtonTo:field];
 }
 
 - (UIView *)createBox:(NSString *)title x:(CGFloat)x y:(CGFloat)y w:(CGFloat)w {

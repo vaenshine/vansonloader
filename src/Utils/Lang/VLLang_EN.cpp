@@ -46,6 +46,14 @@ std::map<std::string, std::string> getLangEN() {
         {"Tool_Clicker", "Auto Clicker"},
         {"Tool_Dump", "Data Export"},
         {"Tool_Config", "Config"},
+        {"Tool_SearchSettings", "Memory Search Settings"},
+        {"Set_Group_Range", "Group Range ±"},
+        {"Set_Group_Range_Placeholder", "Range (0x100 = 256)"},
+        {"Set_Group_Mode", "Group Mode"},
+        {"Group_Anchor", "Anchor"},
+        {"Group_Order", "Order"},
+        {"Set_Float_Tol", "Float Tol."},
+        {"Set_Float_Tol_Placeholder", "e.g. 0.001"},
 
         // Empty States
         {"Empty_Ptr", "No Pointer Config"},
@@ -157,7 +165,7 @@ std::map<std::string, std::string> getLangEN() {
         {"Mode_Slider", "Slider"},
         {"Mode_Switch", "Switch"},
         {"About_Version", "Version %@"},
-        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
+        {"About_License", "Open Source: GPL-3.0"},
 
         // Memory Debug (renamed from Memory Search)
         {"Mem_Title", "Memory Search"},

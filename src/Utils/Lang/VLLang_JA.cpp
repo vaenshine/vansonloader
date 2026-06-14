@@ -46,6 +46,14 @@ std::map<std::string, std::string> getLangJA() {
         {"Tool_Clicker", "オートクリッカー"},
         {"Tool_Dump", "データエクスポート"},
         {"Tool_Config", "設定"},
+        {"Tool_SearchSettings", "メモリ検索設定"},
+        {"Set_Group_Range", "グループ範囲 ±"},
+        {"Set_Group_Range_Placeholder", "範囲 (0x100 = 256)"},
+        {"Set_Group_Mode", "グループモード"},
+        {"Group_Anchor", "アンカー"},
+        {"Group_Order", "順序"},
+        {"Set_Float_Tol", "浮動小数点許容値"},
+        {"Set_Float_Tol_Placeholder", "例: 0.001"},
 
         // 空の状態
         {"Empty_Ptr", "ポインタ設定なし"},
@@ -157,7 +165,7 @@ std::map<std::string, std::string> getLangJA() {
         {"Mode_Slider", "スライダー"},
         {"Mode_Switch", "スイッチ"},
         {"About_Version", "バージョン %@"},
-        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
+        {"About_License", "Open Source: GPL-3.0"},
 
         // メモリ検索
         {"Mem_Title", "メモリ検索"},

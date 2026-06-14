@@ -46,6 +46,14 @@ std::map<std::string, std::string> getLangCN() {
         {"Tool_Clicker", "连点器"},
         {"Tool_Dump", "数据导出"},
         {"Tool_Config", "配置管理"},
+        {"Tool_SearchSettings", "内存搜索设置"},
+        {"Set_Group_Range", "联合范围±"},
+        {"Set_Group_Range_Placeholder", "范围 (0x100 = 256)"},
+        {"Set_Group_Mode", "联合模式"},
+        {"Group_Anchor", "锚点"},
+        {"Group_Order", "顺序"},
+        {"Set_Float_Tol", "浮点数误差"},
+        {"Set_Float_Tol_Placeholder", "例如 0.001"},
 
         // 空状态
         {"Empty_Ptr", "暂无指针配置"},
@@ -157,7 +165,7 @@ std::map<std::string, std::string> getLangCN() {
         {"Mode_Slider", "滑块"},
         {"Mode_Switch", "开关"},
         {"About_Version", "版本 %@"},
-        {"About_License", "v3.1: 搜索时间线、结果恢复、写入撤回\nOpen Source: GPL-3.0"},
+        {"About_License", "Open Source: GPL-3.0"},
 
         // 内存调试 (原内存搜索)
         {"Mem_Title", "内存搜索"},

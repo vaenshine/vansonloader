@@ -46,6 +46,14 @@ std::map<std::string, std::string> getLangKO() {
         {"Tool_Clicker", "자동 클리커"},
         {"Tool_Dump", "데이터 내보내기"},
         {"Tool_Config", "설정"},
+        {"Tool_SearchSettings", "메모리 검색 설정"},
+        {"Set_Group_Range", "그룹 범위 ±"},
+        {"Set_Group_Range_Placeholder", "범위 (0x100 = 256)"},
+        {"Set_Group_Mode", "그룹 모드"},
+        {"Group_Anchor", "앵커"},
+        {"Group_Order", "순서"},
+        {"Set_Float_Tol", "부동 소수점 허용 오차"},
+        {"Set_Float_Tol_Placeholder", "예: 0.001"},
 
         // 빈 상태
         {"Empty_Ptr", "포인터 설정 없음"},
@@ -157,7 +165,7 @@ std::map<std::string, std::string> getLangKO() {
         {"Mode_Slider", "슬라이더"},
         {"Mode_Switch", "스위치"},
         {"About_Version", "버전 %@"},
-        {"About_License", "v3.1: Search Timeline, Snapshot Restore, Write Undo\nOpen Source: GPL-3.0"},
+        {"About_License", "Open Source: GPL-3.0"},
 
         // 메모리 검색
         {"Mem_Title", "메모리 검색"},

@@ -14,6 +14,7 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <utility>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -67,6 +68,35 @@ static inline uint64_t regionEnd(uint64_t start, uint64_t size) {
     return end < start ? UINT64_MAX : end;
 }
 
+struct ExcludedRange {
+    uint64_t start;
+    uint64_t end;
+};
+
+static inline void addExcludedRange(std::vector<ExcludedRange>& ranges,
+                                    const void* ptr,
+                                    size_t length,
+                                    uint64_t padding = 0x4000) {
+    if (!ptr) return;
+    uint64_t start = (uint64_t)(uintptr_t)ptr;
+    uint64_t safeLength = length > 0 ? (uint64_t)length : 1;
+    uint64_t from = start > padding ? start - padding : 0;
+    uint64_t to = start + safeLength + padding;
+    if (to < start) to = UINT64_MAX;
+    ranges.push_back({from, to});
+}
+
+static inline bool overlapsExcludedRange(const std::vector<ExcludedRange>& ranges,
+                                         uint64_t address,
+                                         size_t length) {
+    uint64_t end = address + (uint64_t)std::max((size_t)1, length);
+    if (end < address) end = UINT64_MAX;
+    for (const auto& range : ranges) {
+        if (address < range.end && end > range.start) return true;
+    }
+    return false;
+}
+
 // ============================================================================
 // 构造/析构
 // ============================================================================
@@ -75,7 +105,7 @@ MemCore::MemCore()
     : _task(MACH_PORT_NULL)
     , _resultLimit(0)
     , _floatTolerance(0.001)
-    , _groupSearchRange(200)
+    , _groupSearchRange(0x100)
     , _groupAnchorMode(false)
     , _resultCount(0) {
 }
@@ -374,6 +404,20 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
             parseValue(valueStr, type, &target);
         }
     }
+
+    std::vector<ExcludedRange> searchExcludedRanges;
+    addExcludedRange(searchExcludedRanges, &valueStr, sizeof(valueStr));
+    if (!valueStr.empty()) {
+        addExcludedRange(searchExcludedRanges, valueStr.data(), valueStr.size());
+    }
+    addExcludedRange(searchExcludedRanges, &target, sizeof(target));
+    addExcludedRange(searchExcludedRanges, &minVal, sizeof(minVal));
+    addExcludedRange(searchExcludedRanges, &maxVal, sizeof(maxVal));
+    addExcludedRange(searchExcludedRanges, &gItems, sizeof(gItems));
+    if (!gItems.empty()) {
+        addExcludedRange(searchExcludedRanges, gItems.data(),
+                         gItems.size() * sizeof(GroupItem));
+    }
     
     // 收集内存区域
     struct Region { uint64_t start; uint64_t size; };
@@ -478,6 +522,12 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
         std::vector<GroupItem> gItemsCopy = gItems;
         uint64_t groupRangeLocal = groupRange;
         bool groupAnchorModeLocal = _groupAnchorMode;
+        std::vector<ExcludedRange> excludedRangesCopy = searchExcludedRanges;
+        addExcludedRange(excludedRangesCopy, &gItemsCopy, sizeof(gItemsCopy));
+        if (!gItemsCopy.empty()) {
+            addExcludedRange(excludedRangesCopy, gItemsCopy.data(),
+                             gItemsCopy.size() * sizeof(GroupItem));
+        }
         bool isAutoTypeLocal = isAutoTypeSearch;
         std::vector<MemDataType> autoSubTypesLocal = autoSubTypes;
         bool isStringTypeLocal = isStringType;
@@ -492,6 +542,9 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
             size_t chunkBufferSize = 1024 * 1024;
             uint8_t* memBuffer = (uint8_t*)malloc(chunkBufferSize);
             if (!memBuffer) return;
+
+            std::vector<ExcludedRange> localExcludedRanges = excludedRangesCopy;
+            addExcludedRange(localExcludedRanges, memBuffer, chunkBufferSize, 0);
             
             std::vector<RawResult>& localResults = perRegionResultsPtr[i];
             uint64_t curr = r.start;
@@ -522,6 +575,15 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                         bool match = false;
                         uint64_t valBits = 0;
                         void* ptr = memBuffer + k;
+                        size_t candidateSize = dataSizeLocal;
+                        if (searchModeLocal == 2 && !gItemsCopy.empty()) {
+                            candidateSize = getSizeForType(gItemsCopy[0].type);
+                        } else if (isStringTypeLocal && targetStringLenLocal > 0) {
+                            candidateSize = targetStringLenLocal;
+                        }
+                        if (overlapsExcludedRange(localExcludedRanges, curr + k, candidateSize)) {
+                            continue;
+                        }
                         
                         if (searchModeLocal == 2 && !gItemsCopy.empty()) {
                             // ========== 联合搜索实现 ==========
@@ -560,8 +622,8 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                             
                             if (firstMatch) {
                                 bool allMatched = true;
-                                std::vector<uint64_t> matchedAddrs;
-                                matchedAddrs.push_back(curr + k);
+                                std::vector<std::pair<uint64_t, size_t>> matchedItems;
+                                matchedItems.push_back({curr + k, 0});
                                 size_t anchorOffset = k;
                                 size_t lastMatchOffset = k;
                                 
@@ -583,6 +645,7 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                     for (size_t off = minOff; off < maxOff; ++off) {
                                         if (groupAnchorModeLocal && off == anchorOffset) continue;
                                         if (off + nextSz > readSize) continue;
+                                        if (overlapsExcludedRange(localExcludedRanges, curr + off, nextSz)) continue;
                                         void* nPtr = memBuffer + off;
                                         
                                         if (nextIsFloat) {
@@ -592,7 +655,7 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                                 ? (double)nextItem.value.f : nextItem.value.d;
                                             if (std::abs(nv - nTargetVal) <= floatTolerance) {
                                                 foundNext = true;
-                                                matchedAddrs.push_back(curr + off);
+                                                matchedItems.push_back({curr + off, g});
                                                 lastMatchOffset = off;
                                                 break;
                                             }
@@ -615,7 +678,7 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                             if (nv == nTarget || (nextItem.type == MemDataType::Int64 &&
                                                 (nv & 0xFFFFFFFFFFFF) == (nTarget & 0xFFFFFFFFFFFF))) {
                                                 foundNext = true;
-                                                matchedAddrs.push_back(curr + off);
+                                                matchedItems.push_back({curr + off, g});
                                                 lastMatchOffset = off;
                                                 break;
                                             }
@@ -628,15 +691,19 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                 }
                                 
                                 if (allMatched) {
-                                    std::sort(matchedAddrs.begin(), matchedAddrs.end());
-                                    size_t writeCount = std::min(matchedAddrs.size(), gItemsCopy.size());
-                                    for (size_t wc = 0; wc < writeCount; ++wc) {
-                                        uint64_t addr = matchedAddrs[wc];
+                                    std::sort(matchedItems.begin(), matchedItems.end(),
+                                              [](const std::pair<uint64_t, size_t>& a,
+                                                 const std::pair<uint64_t, size_t>& b) {
+                                        return a.first < b.first;
+                                    });
+                                    for (const auto& matchedItem : matchedItems) {
+                                        uint64_t addr = matchedItem.first;
+                                        size_t itemIndex = matchedItem.second;
                                         RawResult res;
                                         res.address = addr;
-                                        res.type = (uint8_t)gItemsCopy[wc].type;
+                                        res.type = (uint8_t)gItemsCopy[itemIndex].type;
                                         res.value = 0;
-                                        size_t valueSize = getSizeForType(gItemsCopy[wc].type);
+                                        size_t valueSize = getSizeForType(gItemsCopy[itemIndex].type);
                                         memcpy(&res.value, memBuffer + (addr - curr),
                                                std::min((size_t)8, valueSize));
                                         memset(res.padding, 0, sizeof(res.padding));
