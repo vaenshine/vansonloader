@@ -275,15 +275,16 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
 - (void)updateMemUIForMode {
     NSInteger mode = self.memModeSeg.selectedSegmentIndex;
     BOOL isFuzzy = (mode == 1);
+    BOOL fuzzyReady = self.memIsNextScan && self.memHasFuzzyBaseline;
 
-    if (isFuzzy && self.memIsNextScan) {
+    if (isFuzzy && fuzzyReady) {
         self.memFuzzyRow.hidden = NO;
         self.memValueField.hidden = YES;
     } else {
         self.memFuzzyRow.hidden = YES;
         self.memValueField.hidden = NO;
-        self.memValueField.userInteractionEnabled = !(isFuzzy && !self.memIsNextScan);
-        if (isFuzzy && !self.memIsNextScan) {
+        self.memValueField.userInteractionEnabled = !(isFuzzy && !fuzzyReady);
+        if (isFuzzy && !fuzzyReady) {
             self.memValueField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:VL(@"Fuz_First_Hint") attributes:@{NSForegroundColorAttributeName: [[UIColor cyanColor] colorWithAlphaComponent:0.18]}];
         } else if (mode == 2) {
             self.memValueField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:VL(@"Mem_GroupHint") attributes:@{NSForegroundColorAttributeName: [[UIColor cyanColor] colorWithAlphaComponent:0.18]}];
@@ -302,6 +303,7 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
     NSInteger idx = seg.selectedSegmentIndex;
     if (idx >= 0 && idx < (NSInteger)typeMap.count) {
         g_currentType = (VMemDataType)[typeMap[idx] integerValue];
+        self.memHasFuzzyBaseline = NO;
         self.memTypeSeg2.selectedSegmentIndex = UISegmentedControlNoSegment;
         [self syncMemoryTypeSegmentsFromGlobalType];
         [self updateMemUIForMode];
@@ -313,6 +315,7 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
     NSInteger idx = seg.selectedSegmentIndex;
     if (idx >= 0 && idx < (NSInteger)typeMap.count) {
         g_currentType = (VMemDataType)[typeMap[idx] integerValue];
+        self.memHasFuzzyBaseline = NO;
         self.memTypeSeg.selectedSegmentIndex = UISegmentedControlNoSegment;
         if (g_currentType == VMemDataTypeString && self.memModeSeg.selectedSegmentIndex != 0) {
             self.memModeSeg.selectedSegmentIndex = 0;
@@ -372,9 +375,10 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
     CGFloat h = self.memToolbar.bounds.size.height;
     NSInteger mode = self.memModeSeg.selectedSegmentIndex;
     BOOL isFuzzy = (mode == 1);
+    BOOL fuzzyReady = self.memIsNextScan && self.memHasFuzzyBaseline;
 
     NSString *searchTitle = self.memIsNextScan ? VL(@"Mem_Next") : VL(@"Mem_Search");
-    if (isFuzzy && !self.memIsNextScan) searchTitle = VL(@"Mem_Search");
+    if (isFuzzy && !fuzzyReady) searchTitle = VL(@"Mem_Search");
 
     if (isFuzzy) {
         CGFloat btnW = (w - 6) / 2;
@@ -412,12 +416,13 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
     if (self.memIsSearching) return;
 
     VMemSearchMode mode = (VMemSearchMode)self.memModeSeg.selectedSegmentIndex;
+    BOOL fuzzyReady = self.memIsNextScan && self.memHasFuzzyBaseline;
 
-    if (mode == VMemSearchModeFuzzy && !self.memIsNextScan) {
+    if (mode == VMemSearchModeFuzzy && !fuzzyReady) {
         [self doFuzzyFirstSearch];
         return;
     }
-    if (mode == VMemSearchModeFuzzy && self.memIsNextScan) {
+    if (mode == VMemSearchModeFuzzy && fuzzyReady) {
         [self doFuzzyNextScan];
         return;
     }
@@ -532,6 +537,7 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
             if (success) {
                 self.memIsNextScan = YES;
                 self.memIsFirstSearch = YES;
+                self.memHasFuzzyBaseline = YES;
                 NSString *countStr;
                 if (addressCount >= 100000000) countStr = [NSString stringWithFormat:@"%.1f亿", addressCount / 100000000.0];
                 else if (addressCount >= 10000) countStr = [NSString stringWithFormat:@"%.1f万", addressCount / 10000.0];
@@ -580,6 +586,7 @@ static void VLPanelCaptureTimeline(NSString *title, NSString *detail, VMemDataTy
     [[VMemEngine shared] clearFastFuzzySnapshot];
     self.memIsNextScan = NO;
     self.memIsFirstSearch = YES;
+    self.memHasFuzzyBaseline = NO;
     self.memFuzzyRow.selectedSegmentIndex = UISegmentedControlNoSegment;
     [self updateMemUIForMode];
     self.memConsoleLabel.text = VL(@"Mem_Ready");

@@ -141,6 +141,10 @@ private:
     std::mutex _hitMutex;          // 独立锁: 仅保护 hits 写入，避免与 _mutex 交叉死锁
     std::thread _listenerThread;
     WatchHitCallback _hitCallback;
+    uint32_t _lastHitIndex = UINT32_MAX;
+    uint64_t _lastHitPc = 0;
+    uint64_t _lastHitAddress = 0;
+    double _lastHitTimestamp = 0;
     
     static const std::vector<WatchHit> _emptyHits;
 };

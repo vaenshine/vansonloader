@@ -321,12 +321,17 @@ static uint64_t VLParseAddressArg(NSString *arg, uint64_t fallback) {
     uint64_t start = VLParseAddressArg(startArg, 0);
     uint64_t end = VLParseAddressArg(endArg, 0);
     
+    BOOL useGroupMode =
+        type != VMemDataTypeString &&
+        ([val containsString:@";"] || [val containsString:@"::"] ||
+         [val containsString:@" "]);
+
     [engine clearResults];
     
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     __block NSUInteger count = 0;
     
-    [engine scanWithMode:VMemSearchModeExact
+    [engine scanWithMode:useGroupMode ? VMemSearchModeGroup : VMemSearchModeExact
                    value:val
                     type:type
               rangeStart:start
@@ -528,7 +533,9 @@ static uint64_t VLParseAddressArg(NSString *arg, uint64_t fallback) {
         filterMode = VMemFilterModeDecreased;
     } else if ([modeStr isEqualToString:@"eq"]) {
         // 精确匹配或联合搜索
-        if ([val containsString:@";"] || [val containsString:@"::"]) {
+        if (type != VMemDataTypeString &&
+            ([val containsString:@";"] || [val containsString:@"::"] ||
+             [val containsString:@" "])) {
             // 联合搜索模式
             dispatch_semaphore_t sema = dispatch_semaphore_create(0);
             __block NSUInteger count = 0;

@@ -173,7 +173,7 @@ bool DebugCore::attachLocked() {
         slot.active = false;
         _slots.push_back(slot);
     }
-    
+
     if (!setupExceptionPort()) {
         _task = MACH_PORT_NULL;
         return false;
@@ -353,6 +353,7 @@ void DebugCore::listenerThread() {
                 // Phase 4: 异步处理 (目标线程已恢复，锁已释放，可以安全 malloc)
                 dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                     this->safeProcessHit(raw);
+                    usleep(5000);
                     {
                         std::lock_guard<std::mutex> lock(this->_mutex);
                         for (auto &slot : this->_slots) {
@@ -394,6 +395,22 @@ void DebugCore::safeProcessHit(RawHitContext raw) {
         }
     }
 
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    double now = tv.tv_sec + tv.tv_usec / 1000000.0;
+    {
+        std::lock_guard<std::mutex> lock(_hitMutex);
+        if (_lastHitIndex == raw.wpIndex && _lastHitPc == raw.pc &&
+            _lastHitAddress == raw.address &&
+            (now - _lastHitTimestamp) < 0.08) {
+            return;
+        }
+        _lastHitIndex = raw.wpIndex;
+        _lastHitPc = raw.pc;
+        _lastHitAddress = raw.address;
+        _lastHitTimestamp = now;
+    }
+
     WatchHit hit{};
     hit.wpIndex = raw.wpIndex;
     hit.pc = raw.pc;
@@ -423,9 +440,7 @@ void DebugCore::safeProcessHit(RawHitContext raw) {
         }
     }
     
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    hit.timestamp = tv.tv_sec + tv.tv_usec / 1000000.0;
+    hit.timestamp = now;
     hit.stackTrace = {};
     
     {

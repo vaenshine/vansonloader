@@ -297,7 +297,7 @@ std::map<std::string, std::string> getLangKO() {
         {"Undo_Failed", "되돌리기 실패"},
 
         // 메모리 검색 추가
-        {"Mem_GroupHint", "; 또는 ::로 값 구분"},
+        {"Mem_GroupHint", ";, *, ?, w:8, ::로 값 구분"},
         {"Mem_BetweenHint", "범위 검색: 최소값~최대값 또는 최소값-최대값"},
         {"Err_Not_Numeric", "유효한 숫자를 입력하세요"},
         {"Err_Range_Invalid", "범위 형식이 잘못되었습니다"},
@@ -308,7 +308,7 @@ std::map<std::string, std::string> getLangKO() {
 
         // 그룹 검색 도움말
         {"Group_Help_Title", "그룹 검색 가이드"},
-        {"Group_Help_Msg", "메모리 순서로 여러 값을 검색합니다.\n\n1. 기본 (현재 유형 사용):\n   100; 200; 300\n   (값은 이 순서로 나타나야 함)\n\n2. 혼합 유형 (값+유형):\n   100 i32; 0.5 f32; 10 i8\n   (지원: i8, i16, i32, i64, f32, f64)\n\n3. 범위 지정 (끝에 :: 추가):\n   10; 20::100\n   (다음 값은 100바이트 이내)\n\n4. 구분자:\n   세미콜론 (;) 또는 공백 권장"},
+        {"Group_Help_Msg", "메모리 순서로 여러 값을 검색합니다.\n\n1. 기본 (현재 유형 사용):\n   100; 200; 300\n   (값은 이 순서로 나타나야 함)\n\n2. 혼합 유형 (값+유형):\n   100 i32; 0.5 f32; 10 i8\n   (지원: i8, i16, i32, i64, f32, f64)\n\n3. 범위 지정 (끝에 :: 추가):\n   10; 20::100\n   (다음 값은 100바이트 이내)\n\n4. 구분자:\n   세미콜론 (;) 또는 공백 권장\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // 결과 패널
         {"Mem_Results", "검색 결과"},

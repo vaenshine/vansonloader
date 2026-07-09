@@ -160,10 +160,16 @@ static uint64_t VLManagerParseAddressArg(NSString *arg, uint64_t fallback) {
     uint64_t start = VLManagerParseAddressArg(startArg, 0);
     uint64_t end = VLManagerParseAddressArg(endArg, 0);
     
+    VMemDataType type = [self typeFromStr:typeStr];
+    BOOL useGroupMode =
+        type != VMemDataTypeString &&
+        ([val containsString:@";"] || [val containsString:@"::"] ||
+         [val containsString:@" "]);
+
     [[VMemEngine shared] clearResults];
-    [[VMemEngine shared] scanWithMode:VMemSearchModeExact
+    [[VMemEngine shared] scanWithMode:useGroupMode ? VMemSearchModeGroup : VMemSearchModeExact
                                 value:val
-                                 type:[self typeFromStr:typeStr]
+                                 type:type
                            rangeStart:start
                              rangeEnd:end
                            completion:^(NSUInteger count, NSString *msg) {

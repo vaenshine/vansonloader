@@ -245,7 +245,7 @@ std::map<std::string, std::string> getLangDE() {
         {"Undo_Failed", "Rückgängig fehlgeschlagen"},
 
         // Speichersuche zusätzlich
-        {"Mem_GroupHint", "Verwenden Sie ; oder :: zum Trennen"},
+        {"Mem_GroupHint", "Verwenden Sie ;, *, ?, w:8 oder :: zum Trennen"},
         {"Mem_BetweenHint", "Bereichssuche: min~max oder min-max eingeben"},
         {"Err_Not_Numeric", "Bitte geben Sie eine gültige Zahl ein"},
         {"Err_Range_Invalid", "Ungültiges Bereichsformat"},
@@ -302,7 +302,7 @@ std::map<std::string, std::string> getLangDE() {
 
         // Gruppensuche-Hilfe
         {"Group_Help_Title", "Gruppensuche-Anleitung"},
-        {"Group_Help_Msg", "Mehrere Werte in Speicherreihenfolge suchen.\n\n1. Grundlegend (aktuellen Typ verwenden):\n   100; 200; 300\n   (Werte müssen in dieser Reihenfolge erscheinen)\n\n2. Gemischte Typen (Wert+Typ):\n   100 i32; 0.5 f32; 10 i8\n   (Unterstützt: i8, i16, i32, i64, f32, f64)\n\n3. Bereich angeben (:: am Ende hinzufügen):\n   10; 20::100\n   (Nächster Wert innerhalb von 100 Bytes)\n\n4. Trennzeichen:\n   Semikolon (;) oder Leerzeichen empfohlen"},
+        {"Group_Help_Msg", "Mehrere Werte in Speicherreihenfolge suchen.\n\n1. Grundlegend (aktuellen Typ verwenden):\n   100; 200; 300\n   (Werte müssen in dieser Reihenfolge erscheinen)\n\n2. Gemischte Typen (Wert+Typ):\n   100 i32; 0.5 f32; 10 i8\n   (Unterstützt: i8, i16, i32, i64, f32, f64)\n\n3. Bereich angeben (:: am Ende hinzufügen):\n   10; 20::100\n   (Nächster Wert innerhalb von 100 Bytes)\n\n4. Trennzeichen:\n   Semikolon (;) oder Leerzeichen empfohlen\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // Unscharfe Suche Hinweise
         {"Fuz_Hint_Increased", "Adressen filtern, wo der Wert gestiegen ist"},

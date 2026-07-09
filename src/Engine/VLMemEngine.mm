@@ -9,6 +9,27 @@
 #include <memory>
 #include <cmath>
 
+static const NSUInteger VL_VISIBLE_STRING_MAX_LEN = 256;
+
+static BOOL VLIsVisibleStringByte(uint8_t b) {
+    return (b >= 0x20 && b <= 0x7E) || b >= 0xC0;
+}
+
+static NSString *VLStringFromVisibleBytes(const uint8_t *bytes, NSUInteger length) {
+    if (!bytes || length == 0) return @"";
+
+    NSUInteger len = 0;
+    while (len < length && len < VL_VISIBLE_STRING_MAX_LEN) {
+        if (bytes[len] == '\0') break;
+        if (!VLIsVisibleStringByte(bytes[len])) break;
+        len++;
+    }
+    if (len == 0) return @"";
+
+    NSString *str = [[NSString alloc] initWithBytes:bytes length:len encoding:NSUTF8StringEncoding];
+    return str ?: @"";
+}
+
 static uint64_t VLParseUnsignedSetting(NSString *text, uint64_t fallback) {
     NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (trimmed.length == 0) return fallback;
@@ -301,24 +322,10 @@ static vcore::MemDataType toMemDataType(VMemDataType type) {
     
     size_t sz = vcore::getSizeForType(cppItem.type);
     if (cppItem.type == vcore::MemDataType::String) {
-        // String: read up to 128 bytes from memory
-        uint8_t strBuf[129] = {0};
-        size_t readLen = 128;
+        uint8_t strBuf[VL_VISIBLE_STRING_MAX_LEN] = {0};
+        size_t readLen = VL_VISIBLE_STRING_MAX_LEN;
         if (_core->readMem(cppItem.address, strBuf, readLen)) {
-            strBuf[128] = 0;
-            size_t len = strnlen((char*)strBuf, 128);
-            NSString *str = [[NSString alloc] initWithBytes:strBuf length:len encoding:NSUTF8StringEncoding];
-            if (!str) {
-                // Fallback: try ASCII, replace non-printable
-                NSMutableString *ascii = [NSMutableString string];
-                for (size_t i = 0; i < len && i < 128; i++) {
-                    uint8_t c = strBuf[i];
-                    if (c >= 32 && c < 127) [ascii appendFormat:@"%c", c];
-                    else [ascii appendString:@"."];
-                }
-                str = ascii;
-            }
-            item.valueStr = str;
+            item.valueStr = VLStringFromVisibleBytes(strBuf, readLen);
         } else {
             item.valueStr = @"(Err)";
         }
@@ -512,21 +519,9 @@ static vcore::MemDataType toMemDataType(VMemDataType type) {
         case VMemDataTypeF32: return [NSString stringWithFormat:@"%.4f", *(float*)buf];
         case VMemDataTypeF64: return [NSString stringWithFormat:@"%.4lf", *(double*)buf];
         case VMemDataTypeString: {
-            uint8_t strBuf[129] = {0};
-            if (_core->readMem(address, strBuf, 128)) {
-                strBuf[128] = 0;
-                size_t len = strnlen((char*)strBuf, 128);
-                NSString *str = [[NSString alloc] initWithBytes:strBuf length:len encoding:NSUTF8StringEncoding];
-                if (!str) {
-                    NSMutableString *ascii = [NSMutableString string];
-                    for (size_t i = 0; i < len && i < 128; i++) {
-                        uint8_t c = strBuf[i];
-                        if (c >= 32 && c < 127) [ascii appendFormat:@"%c", c];
-                        else [ascii appendString:@"."];
-                    }
-                    str = ascii;
-                }
-                return str.length > 0 ? str : @"(empty)";
+            uint8_t strBuf[VL_VISIBLE_STRING_MAX_LEN] = {0};
+            if (_core->readMem(address, strBuf, VL_VISIBLE_STRING_MAX_LEN)) {
+                return VLStringFromVisibleBytes(strBuf, VL_VISIBLE_STRING_MAX_LEN);
             }
             return @"(Err)";
         }

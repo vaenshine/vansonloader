@@ -245,7 +245,7 @@ std::map<std::string, std::string> getLangFR() {
         {"Undo_Failed", "Echec de l'annulation"},
 
         // Recherche mémoire supplémentaire
-        {"Mem_GroupHint", "Utilisez ; ou :: pour séparer"},
+        {"Mem_GroupHint", "Utilisez ;, *, ?, w:8 ou :: pour séparer"},
         {"Mem_BetweenHint", "Recherche par plage: entrez min~max ou min-max"},
         {"Err_Not_Numeric", "Veuillez entrer un nombre valide"},
         {"Err_Range_Invalid", "Format de plage invalide"},
@@ -305,7 +305,7 @@ std::map<std::string, std::string> getLangFR() {
 
         // Aide de recherche de groupe
         {"Group_Help_Title", "Guide de recherche de groupe"},
-        {"Group_Help_Msg", "Rechercher plusieurs valeurs dans l'ordre de la mémoire.\n\n1. Basique (utiliser le type actuel):\n   100; 200; 300\n   (Les valeurs doivent apparaître dans cet ordre)\n\n2. Types mixtes (valeur+type):\n   100 i32; 0.5 f32; 10 i8\n   (Supporte: i8, i16, i32, i64, f32, f64)\n\n3. Spécifier la plage (ajouter :: à la fin):\n   10; 20::100\n   (Valeur suivante dans 100 octets)\n\n4. Séparateurs:\n   Point-virgule (;) ou espace recommandé"},
+        {"Group_Help_Msg", "Rechercher plusieurs valeurs dans l'ordre de la mémoire.\n\n1. Basique (utiliser le type actuel):\n   100; 200; 300\n   (Les valeurs doivent apparaître dans cet ordre)\n\n2. Types mixtes (valeur+type):\n   100 i32; 0.5 f32; 10 i8\n   (Supporte: i8, i16, i32, i64, f32, f64)\n\n3. Spécifier la plage (ajouter :: à la fin):\n   10; 20::100\n   (Valeur suivante dans 100 octets)\n\n4. Séparateurs:\n   Point-virgule (;) ou espace recommandé\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // Conseils de recherche floue
         {"Fuz_Hint_Increased", "Filtrer les adresses où la valeur a augmenté"},

@@ -17,6 +17,36 @@ void showToast(NSString *msg);
 
 // 触摸穿透模式（在 VLTools.m 中定义）
 extern BOOL g_touchPassthroughMode;
+static const NSUInteger VL_STRING_EDIT_MAX_LEN = 8192;
+
+static BOOL VLStringEditVisibleByte(uint8_t b) {
+    return (b >= 0x20 && b <= 0x7E) || b >= 0xC0;
+}
+
+static NSString *VLStringEditReadVisible(uint64_t address, NSString *fallback, NSUInteger *lengthOut) {
+    NSData *data = [[VLMemEngine shared] readMemory:address length:VL_STRING_EDIT_MAX_LEN];
+    NSUInteger fallbackLen = [fallback lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    if (data.length == 0) {
+        if (lengthOut) *lengthOut = fallbackLen;
+        return fallback ?: @"";
+    }
+
+    const uint8_t *bytes = (const uint8_t *)data.bytes;
+    NSUInteger len = 0;
+    while (len < data.length && len < VL_STRING_EDIT_MAX_LEN) {
+        if (bytes[len] == '\0') break;
+        if (!VLStringEditVisibleByte(bytes[len])) break;
+        len++;
+    }
+    if (len == 0) {
+        if (lengthOut) *lengthOut = fallbackLen;
+        return fallback ?: @"";
+    }
+
+    NSString *str = [[NSString alloc] initWithBytes:bytes length:len encoding:NSUTF8StringEncoding];
+    if (lengthOut) *lengthOut = str ? len : fallbackLen;
+    return str ?: (fallback ?: @"");
+}
 
 static BOOL VLInputLooksHex(NSString *input) {
     NSCharacterSet *hexLetters = [NSCharacterSet characterSetWithCharactersInString:@"abcdefABCDEF"];
@@ -303,7 +333,12 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     
     // 重新加载数据
     [self updateTypeSize];
-    [self loadInitialData];
+    if (_isStrMode) {
+        [self loadStrData];
+        [_tableView reloadData];
+    } else {
+        [self loadInitialData];
+    }
     [self startLockTimer];
     [self startRefreshTimer];
     
@@ -528,8 +563,26 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     _strMinAddr = scanStart;
     _strMaxAddr = scanEnd;
     
+    NSMutableDictionary *targetItem = [self stringItemAtAddress:_targetAddress fallback:nil];
+    if (targetItem) {
+        [_strDataList addObject:targetItem];
+    }
+
     NSArray *results = [self scanStringsFrom:scanStart to:scanEnd];
-    [_strDataList addObjectsFromArray:results];
+    for (NSMutableDictionary *item in results) {
+        uint64_t addr = [item[@"addr"] unsignedLongLongValue];
+        if (addr == _targetAddress) {
+            if (_strDataList.count > 0) {
+                NSMutableDictionary *existing = _strDataList[0];
+                existing[@"value"] = item[@"value"] ?: @"";
+                existing[@"originalSize"] = item[@"originalSize"] ?: @(0);
+            } else {
+                [_strDataList addObject:item];
+            }
+            continue;
+        }
+        [_strDataList addObject:item];
+    }
 }
 
 - (void)loadMoreStrData:(BOOL)next {
@@ -638,8 +691,9 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
 
 - (void)scrollToTargetAndHighlight {
     NSInteger targetIndex = -1;
-    for (NSInteger i = 0; i < _memoryData.count; i++) {
-        uint64_t addr = [_memoryData[i][@"addr"] unsignedLongLongValue];
+    NSArray *list = _isStrMode ? _strDataList : _memoryData;
+    for (NSInteger i = 0; i < list.count; i++) {
+        uint64_t addr = [list[i][@"addr"] unsignedLongLongValue];
         if (addr == _targetAddress) {
             targetIndex = i;
             break;
@@ -883,6 +937,20 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     return str;
 }
 
+- (NSMutableDictionary *)stringItemAtAddress:(uint64_t)address fallback:(NSString *)fallback {
+    NSUInteger len = 0;
+    NSString *value = [self readVisibleStringAtAddress:address
+                                             fallback:fallback
+                                            lengthOut:&len];
+    if (!value && !fallback) return nil;
+
+    return [@{
+        @"addr": @(address),
+        @"value": value ?: (fallback ?: @""),
+        @"originalSize": @(len)
+    } mutableCopy];
+}
+
 - (void)refreshVisibleDataSilently {
     if (!_containerView || _containerView.hidden || _panelView.hidden || !_tableView.window) return;
     if (_isLoading || _isInitialLoad) return;
@@ -957,6 +1025,7 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     if (_isStrMode) {
         [self loadStrData];
         [_tableView reloadData];
+        [self scrollToTargetAndHighlight];
     } else {
         [self loadInitialData];
         [self scrollToTargetAndHighlight];
@@ -973,9 +1042,7 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     if (_isStrMode) {
         [self loadStrData];
         [_tableView reloadData];
-        if (_strDataList.count > 0) {
-            [_tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0] atScrollPosition:UITableViewScrollPositionTop animated:NO];
-        }
+        [self scrollToTargetAndHighlight];
     } else {
         [self loadInitialData];
         [self scrollToTargetAndHighlight];
@@ -1051,10 +1118,13 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
         NSDictionary *item = _strDataList[indexPath.row];
         uint64_t addr = [item[@"addr"] unsignedLongLongValue];
         NSUInteger origSize = [item[@"originalSize"] unsignedIntegerValue];
+        BOOL isTarget = (addr == _targetAddress);
         cell.textLabel.text = [NSString stringWithFormat:@"0x%llX [%lu]", addr, (unsigned long)origSize];
         NSString *display = item[@"value"];
         if (display.length > 40) display = [[display substringToIndex:40] stringByAppendingString:@"..."];
         cell.detailTextLabel.text = [NSString stringWithFormat:@"\"%@\"", display];
+        cell.backgroundColor = isTarget ? [[UIColor yellowColor] colorWithAlphaComponent:0.15]
+                                        : [[UIColor cyanColor] colorWithAlphaComponent:0.03];
         cell.accessoryType = UITableViewCellAccessoryNone;
         return cell;
     }
@@ -1225,15 +1295,27 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
 
 - (void)showStrEditAlert:(NSMutableDictionary *)item indexPath:(NSIndexPath *)indexPath {
     uint64_t addr = [item[@"addr"] unsignedLongLongValue];
-    NSUInteger origSize = [item[@"originalSize"] unsignedIntegerValue];
-    NSString *msg = [NSString stringWithFormat:@"0x%llX\n%@ %lu", addr, VL(@"Browser_Str_OrigLen"), (unsigned long)origSize];
-    
+    NSUInteger origSize = 0;
+    NSString *raw = VLStringEditReadVisible(addr, item[@"value"], &origSize);
+    item[@"fullValue"] = raw ?: @"";
+
+    NSString *msg = [NSString stringWithFormat:@"0x%llX\n%@ %lu\n\n\n\n\n\n\n\n\n\n", addr, VL(@"Browser_Str_OrigLen"), (unsigned long)origSize];
+
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:VL(@"Browser_Str_Edit") message:msg preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-        tf.text = item[@"value"];
-        tf.keyboardType = UIKeyboardTypeDefault;
-        tf.clearButtonMode = UITextFieldViewModeAlways;
-    }];
+    UITextView *textView = [[UITextView alloc] initWithFrame:CGRectZero];
+    textView.text = raw ?: @"";
+    textView.font = [UIFont monospacedSystemFontOfSize:13 weight:UIFontWeightRegular];
+    textView.layer.borderWidth = 0.5;
+    textView.layer.borderColor = [UIColor.separatorColor CGColor];
+    textView.layer.cornerRadius = 6.0;
+    textView.translatesAutoresizingMaskIntoConstraints = NO;
+    [alert.view addSubview:textView];
+    [NSLayoutConstraint activateConstraints:@[
+        [textView.leadingAnchor constraintEqualToAnchor:alert.view.leadingAnchor constant:18],
+        [textView.trailingAnchor constraintEqualToAnchor:alert.view.trailingAnchor constant:-18],
+        [textView.topAnchor constraintEqualToAnchor:alert.view.topAnchor constant:104],
+        [textView.heightAnchor constraintEqualToConstant:220],
+    ]];
     
     __weak typeof(self) weakSelf = self;
     VLMemWriteUndoItem *undo = [[VLMemEngine shared] lastManualWriteUndoForAddress:addr type:VMemDataTypeString];
@@ -1251,7 +1333,7 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
         }]];
     }
     [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Confirm") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
-        NSString *newVal = alert.textFields.firstObject.text ?: @"";
+        NSString *newVal = textView.text ?: @"";
         NSUInteger newLen = [newVal lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
         
         if (newLen > origSize) {
@@ -1279,7 +1361,7 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     uint64_t addr = [item[@"addr"] unsignedLongLongValue];
     const char *cstr = [newVal UTF8String];
     NSUInteger writeLen = strlen(cstr) + 1;
-    NSString *oldVal = item[@"value"] ?: @"";
+    NSString *oldVal = item[@"fullValue"] ?: item[@"value"] ?: @"";
     NSUInteger oldSize = MAX([[oldVal dataUsingEncoding:NSUTF8StringEncoding] length] + 1, writeLen);
     NSData *oldData = [[VLMemEngine shared] readMemory:addr length:oldSize];
     [[VLMemEngine shared] rememberManualWriteUndoAtAddress:addr
@@ -1291,6 +1373,7 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     [[VLMemEngine shared] writeMemory:addr data:data];
     
     item[@"value"] = newVal;
+    [item removeObjectForKey:@"fullValue"];
     item[@"originalSize"] = @(writeLen - 1);
     [_tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
     showToast(VL(@"Mem_WriteOK"));

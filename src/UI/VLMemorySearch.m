@@ -149,6 +149,7 @@ static BOOL g_isFuzzyLocked = NO;  // 模糊搜索锁定状态
 @property (nonatomic, strong) UIButton *refreshBtnTop;  // 顶部刷新按钮（类型选择行旁边）
 @property (nonatomic, strong) NSMutableDictionary *lockedItems;  // 地址 -> 锁定值
 @property (nonatomic, assign) BOOL isNextScan;
+@property (nonatomic, assign) BOOL hasFuzzyBaseline;
 @property (nonatomic, assign) BOOL isUISetup;
 @end
 
@@ -553,7 +554,8 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     
     // 搜索按钮文字
     NSString *searchTitle;
-    if (isFuzzy && !_isNextScan) {
+    BOOL fuzzyReady = _isNextScan && self.hasFuzzyBaseline;
+    if (isFuzzy && !fuzzyReady) {
         searchTitle = VL(@"Mem_Search");
     } else {
         searchTitle = _isNextScan ? VL(@"Mem_Next") : VL(@"Mem_Search");
@@ -701,7 +703,8 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     
     // ========== 模糊搜索UI布局 ==========
     if (isFuzzy) {
-        if (_isNextScan) {
+        BOOL fuzzyReady = _isNextScan && self.hasFuzzyBaseline;
+        if (fuzzyReady) {
             // 模糊搜索后续筛选：显示fuzzyRow1，隐藏输入框
             _fuzzyRow1.hidden = NO;
             _fuzzyRow1.frame = CGRectMake(margin, baseY, ctrlW, 28);
@@ -750,6 +753,7 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     NSInteger idx = seg.selectedSegmentIndex;
     if (idx >= 0 && idx < typeMap.count) {
         g_currentType = (VMemDataType)[typeMap[idx] integerValue];
+        self.hasFuzzyBaseline = NO;
         // 取消第二行选中
         _typeSeg2.selectedSegmentIndex = UISegmentedControlNoSegment;
         // 更新UI状态（置灰逻辑）
@@ -763,6 +767,7 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     NSInteger idx = seg.selectedSegmentIndex;
     if (idx >= 0 && idx < typeMap.count) {
         g_currentType = (VMemDataType)[typeMap[idx] integerValue];
+        self.hasFuzzyBaseline = NO;
         // 取消第一行选中
         _typeSeg.selectedSegmentIndex = UISegmentedControlNoSegment;
         
@@ -958,12 +963,13 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     
     VMemSearchMode mode = (VMemSearchMode)_modeSeg.selectedSegmentIndex;
     
-    if (mode == VMemSearchModeFuzzy && !_isNextScan) {
+    BOOL fuzzyReady = _isNextScan && self.hasFuzzyBaseline;
+    if (mode == VMemSearchModeFuzzy && !fuzzyReady) {
         [self doFuzzyFirstSearch];
         return;
     }
     
-    if (mode == VMemSearchModeFuzzy && _isNextScan) {
+    if (mode == VMemSearchModeFuzzy && fuzzyReady) {
         [self doFuzzyNextScan];
         return;
     }
@@ -1092,6 +1098,7 @@ static VLMemorySearchVC *g_memSearchVC = nil;
             
             if (success) {
                 self->_isNextScan = YES;
+                self.hasFuzzyBaseline = YES;
                 g_isFirstSearch = YES;
                 
                 g_isFuzzyLocked = YES;
@@ -1244,6 +1251,7 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     [[VMemEngine shared] clearResults];
     [[VMemEngine shared] clearFastFuzzySnapshot];
     _isNextScan = NO;
+    self.hasFuzzyBaseline = NO;
     g_isFirstSearch = YES;
     _fuzzyRow1.selectedSegmentIndex = UISegmentedControlNoSegment;
     

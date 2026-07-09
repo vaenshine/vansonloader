@@ -102,6 +102,8 @@ struct GroupItem {
         double d;
     } value;
     bool relative;
+    bool isWildcard;
+    uint64_t skipBytes;
 };
 
 // 快照区域

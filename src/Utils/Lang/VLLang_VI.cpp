@@ -245,7 +245,7 @@ std::map<std::string, std::string> getLangVI() {
         {"Undo_Failed", "Hoan tac that bai"},
 
         // Tìm kiếm bộ nhớ bổ sung
-        {"Mem_GroupHint", "Dùng ; hoặc :: để phân tách"},
+        {"Mem_GroupHint", "Dùng ;, *, ?, w:8 hoặc :: để phân tách"},
         {"Mem_BetweenHint", "Tìm theo phạm vi: nhập min~max hoặc min-max"},
         {"Err_Not_Numeric", "Vui lòng nhập số hợp lệ"},
         {"Err_Range_Invalid", "Định dạng phạm vi không hợp lệ"},
@@ -302,7 +302,7 @@ std::map<std::string, std::string> getLangVI() {
 
         // Hướng dẫn tìm kiếm nhóm
         {"Group_Help_Title", "Hướng dẫn tìm kiếm nhóm"},
-        {"Group_Help_Msg", "Tìm kiếm nhiều giá trị theo thứ tự bộ nhớ.\n\n1. Cơ bản (dùng loại hiện tại):\n   100; 200; 300\n   (Giá trị phải xuất hiện theo thứ tự này)\n\n2. Loại hỗn hợp (giá trị+loại):\n   100 i32; 0.5 f32; 10 i8\n   (Hỗ trợ: i8, i16, i32, i64, f32, f64)\n\n3. Chỉ định phạm vi (thêm :: ở cuối):\n   10; 20::100\n   (Giá trị tiếp theo trong 100 byte)\n\n4. Dấu phân cách:\n   Khuyến nghị dùng dấu chấm phẩy (;) hoặc khoảng trắng"},
+        {"Group_Help_Msg", "Tìm kiếm nhiều giá trị theo thứ tự bộ nhớ.\n\n1. Cơ bản (dùng loại hiện tại):\n   100; 200; 300\n   (Giá trị phải xuất hiện theo thứ tự này)\n\n2. Loại hỗn hợp (giá trị+loại):\n   100 i32; 0.5 f32; 10 i8\n   (Hỗ trợ: i8, i16, i32, i64, f32, f64)\n\n3. Chỉ định phạm vi (thêm :: ở cuối):\n   10; 20::100\n   (Giá trị tiếp theo trong 100 byte)\n\n4. Dấu phân cách:\n   Khuyến nghị dùng dấu chấm phẩy (;) hoặc khoảng trắng\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // Gợi ý tìm kiếm mờ
         {"Fuz_Hint_Increased", "Lọc địa chỉ có giá trị tăng"},

@@ -246,7 +246,7 @@ std::map<std::string, std::string> getLangES() {
         {"Undo_Failed", "Error al deshacer"},
 
         // Búsqueda de memoria adicional
-        {"Mem_GroupHint", "Use ; o :: para separar valores"},
+        {"Mem_GroupHint", "Use ;, *, ?, w:8 o :: para separar valores"},
         {"Mem_BetweenHint", "Búsqueda por rango: ingrese mín~máx o mín-máx"},
         {"Err_Not_Numeric", "Ingrese un número válido"},
         {"Err_Range_Invalid", "Formato de rango inválido"},
@@ -306,7 +306,7 @@ std::map<std::string, std::string> getLangES() {
 
         // Ayuda de búsqueda de grupo
         {"Group_Help_Title", "Guía de búsqueda de grupo"},
-        {"Group_Help_Msg", "Buscar múltiples valores en orden de memoria.\n\n1. Básico (usar tipo actual):\n   100; 200; 300\n   (Los valores deben aparecer en este orden)\n\n2. Tipos mixtos (valor+tipo):\n   100 i32; 0.5 f32; 10 i8\n   (Soporta: i8, i16, i32, i64, f32, f64)\n\n3. Especificar rango (agregar :: al final):\n   10; 20::100\n   (Siguiente valor dentro de 100 bytes)\n\n4. Separadores:\n   Se recomienda punto y coma (;) o espacio"},
+        {"Group_Help_Msg", "Buscar múltiples valores en orden de memoria.\n\n1. Básico (usar tipo actual):\n   100; 200; 300\n   (Los valores deben aparecer en este orden)\n\n2. Tipos mixtos (valor+tipo):\n   100 i32; 0.5 f32; 10 i8\n   (Soporta: i8, i16, i32, i64, f32, f64)\n\n3. Especificar rango (agregar :: al final):\n   10; 20::100\n   (Siguiente valor dentro de 100 bytes)\n\n4. Separadores:\n   Se recomienda punto y coma (;) o espacio\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // Sugerencias de búsqueda difusa
         {"Fuz_Hint_Increased", "Filtrar direcciones donde el valor aumentó"},

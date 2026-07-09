@@ -246,7 +246,7 @@ std::map<std::string, std::string> getLangPT() {
         {"Undo_Failed", "Falha ao desfazer"},
 
         // Busca de memória adicional
-        {"Mem_GroupHint", "Use ; ou :: para separar valores"},
+        {"Mem_GroupHint", "Use ;, *, ?, w:8 ou :: para separar valores"},
         {"Mem_BetweenHint", "Busca por faixa: digite mín~máx ou mín-máx"},
         {"Err_Not_Numeric", "Insira um número válido"},
         {"Err_Range_Invalid", "Formato de faixa inválido"},
@@ -303,7 +303,7 @@ std::map<std::string, std::string> getLangPT() {
 
         // Ajuda de busca de grupo
         {"Group_Help_Title", "Guia de busca de grupo"},
-        {"Group_Help_Msg", "Buscar múltiplos valores na ordem da memória.\n\n1. Básico (usar tipo atual):\n   100; 200; 300\n   (Os valores devem aparecer nesta ordem)\n\n2. Tipos mistos (valor+tipo):\n   100 i32; 0.5 f32; 10 i8\n   (Suporta: i8, i16, i32, i64, f32, f64)\n\n3. Especificar intervalo (adicionar :: no final):\n   10; 20::100\n   (Próximo valor dentro de 100 bytes)\n\n4. Separadores:\n   Recomendado ponto e vírgula (;) ou espaço"},
+        {"Group_Help_Msg", "Buscar múltiplos valores na ordem da memória.\n\n1. Básico (usar tipo atual):\n   100; 200; 300\n   (Os valores devem aparecer nesta ordem)\n\n2. Tipos mistos (valor+tipo):\n   100 i32; 0.5 f32; 10 i8\n   (Suporta: i8, i16, i32, i64, f32, f64)\n\n3. Especificar intervalo (adicionar :: no final):\n   10; 20::100\n   (Próximo valor dentro de 100 bytes)\n\n4. Separadores:\n   Recomendado ponto e vírgula (;) ou espaço\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // Dicas de busca difusa
         {"Fuz_Hint_Increased", "Filtrar endereços onde o valor aumentou"},

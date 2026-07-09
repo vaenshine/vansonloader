@@ -307,7 +307,7 @@ std::map<std::string, std::string> getLangEN() {
         {"Undo_Failed", "Undo failed"},
 
         // Memory Search Additional
-        {"Mem_GroupHint", "Use ; or :: to separate values"},
+        {"Mem_GroupHint", "Use ;, *, ?, w:8, or :: to separate values"},
         {"Mem_BetweenHint", "Range search: enter min~max or min-max"},
         {"Err_Not_Numeric", "Please enter a valid number"},
         {"Err_Range_Invalid", "Invalid range format"},
@@ -318,7 +318,7 @@ std::map<std::string, std::string> getLangEN() {
 
         // Group Search Help
         {"Group_Help_Title", "Group Search Guide"},
-        {"Group_Help_Msg", "Search multiple values in memory order.\n\n1. Basic (use current type):\n   100; 200; 300\n   (Values must appear in this order)\n\n2. Mixed types (value+type):\n   100 i32; 0.5 f32; 10 i8\n   (Supports: i8, i16, i32, i64, f32, f64)\n\n3. Specify range (add :: at end):\n   10; 20::100\n   (Next value within 100 bytes)\n\n4. Separators:\n   Semicolon (;) or space recommended"},
+        {"Group_Help_Msg", "Search multiple values in memory order.\n\n1. Basic (use current type):\n   100; 200; 300\n   (Values must appear in this order)\n\n2. Mixed types (value+type):\n   100 i32; 0.5 f32; 10 i8\n   (Supports: i8, i16, i32, i64, f32, f64)\n\n3. Specify range (add :: at end):\n   10; 20::100\n   (Next value within 100 bytes)\n\n4. Separators:\n   Semicolon (;) or space recommended\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // Memory Results Panel
         {"Mem_Results", "Results"},

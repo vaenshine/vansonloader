@@ -157,6 +157,7 @@ static inline UIColor *VLStrokeColor(void) {
 @property (nonatomic, assign) BOOL memIsNextScan;
 @property (nonatomic, assign) BOOL memIsFirstSearch;
 @property (nonatomic, assign) BOOL memIsSearching;
+@property (nonatomic, assign) BOOL memHasFuzzyBaseline;
 @property (nonatomic, strong) NSMutableDictionary *memLockedItems;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *multiSelectedAddresses;
 @property (nonatomic, strong) NSMutableDictionary<NSNumber *, NSNumber *> *multiSelectedTypes;

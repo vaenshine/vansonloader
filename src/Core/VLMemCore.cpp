@@ -247,6 +247,118 @@ static MemDataType getTypeFromSuffix(std::string& valStr, MemDataType defaultTyp
     return defaultType;
 }
 
+static std::string trimGroupToken(const std::string& input) {
+    std::string s = input;
+    size_t first = s.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos) return "";
+    size_t last = s.find_last_not_of(" \t\n\r");
+    return s.substr(first, last - first + 1);
+}
+
+static bool isWildcardGroupToken(const std::string& s) {
+    return s == "*" || s == "?";
+}
+
+static bool parseGroupSkipToken(const std::string& s, uint64_t& skipBytes) {
+    std::string lower = s;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    if (lower.rfind("w:", 0) != 0) return false;
+    std::string num = lower.substr(2);
+    try {
+        skipBytes = (num.rfind("0x", 0) == 0)
+            ? std::stoull(num, nullptr, 16)
+            : std::stoull(num);
+        return true;
+    } catch (...) {
+        skipBytes = 0;
+        return true;
+    }
+}
+
+static bool dataTypeFromBytePrefix(const std::string& prefix, MemDataType& type) {
+    if (prefix == "1") { type = MemDataType::Int8; return true; }
+    if (prefix == "2") { type = MemDataType::Int16; return true; }
+    if (prefix == "4") { type = MemDataType::Int32; return true; }
+    if (prefix == "8") { type = MemDataType::Int64; return true; }
+    return false;
+}
+
+static bool stripGroupBytePrefix(std::string& valStr, MemDataType& type) {
+    size_t colon = valStr.find(':');
+    if (colon == std::string::npos) return false;
+    std::string prefix = trimGroupToken(valStr.substr(0, colon));
+    if (prefix.empty() ||
+        prefix.find_first_not_of("0123456789") != std::string::npos) {
+        return false;
+    }
+    MemDataType parsedType = type;
+    if (!dataTypeFromBytePrefix(prefix, parsedType)) return false;
+    type = parsedType;
+    valStr = trimGroupToken(valStr.substr(colon + 1));
+    return true;
+}
+
+static bool groupUsesLayoutMode(const std::vector<GroupItem>& items) {
+    for (const GroupItem& item : items) {
+        if (item.isWildcard || item.skipBytes > 0) return true;
+    }
+    return false;
+}
+
+static bool matchGroupValue(const void* ptr, const GroupItem& item, double floatTolerance) {
+    if (item.isWildcard) return true;
+    if (vcore::isFloatType(item.type)) {
+        double v = (item.type == MemDataType::Float) ? *(const float*)ptr : *(const double*)ptr;
+        double target = (item.type == MemDataType::Float) ? (double)item.value.f : item.value.d;
+        return std::abs(v - target) <= floatTolerance;
+    }
+
+    size_t sz = getSizeForType(item.type);
+    int64_t v = 0, target = 0;
+    switch (item.type) {
+        case MemDataType::Int8:   v = *(const int8_t*)ptr; target = item.value.i8; break;
+        case MemDataType::Int16:  v = *(const int16_t*)ptr; target = item.value.i16; break;
+        case MemDataType::Int32:  v = *(const int32_t*)ptr; target = item.value.i32; break;
+        case MemDataType::Int64:  v = *(const int64_t*)ptr; target = item.value.i64; break;
+        default: {
+            uint64_t uv = 0;
+            memcpy(&uv, ptr, sz > 8 ? 8 : sz);
+            v = (int64_t)uv;
+            target = (int64_t)item.value.u64;
+            break;
+        }
+    }
+    return v == target || (item.type == MemDataType::Int64 &&
+                           (((uint64_t)v) & 0xFFFFFFFFFFFFULL) ==
+                           (((uint64_t)target) & 0xFFFFFFFFFFFFULL));
+}
+
+static bool matchGroupLayoutAt(uint8_t* memBuffer, size_t readSize,
+                               size_t startOffset,
+                               const std::vector<GroupItem>& items,
+                               double floatTolerance,
+                               std::vector<std::pair<uint64_t, size_t>>& matches,
+                               uint64_t chunkBase) {
+    size_t cursor = startOffset;
+    matches.clear();
+    for (size_t i = 0; i < items.size(); ++i) {
+        const GroupItem& item = items[i];
+        if (item.skipBytes > 0) {
+            if (cursor + item.skipBytes > readSize) return false;
+            cursor += (size_t)item.skipBytes;
+            continue;
+        }
+        size_t itemSize = getSizeForType(item.type);
+        if (cursor + itemSize > readSize) return false;
+        if (!item.isWildcard && !matchGroupValue(memBuffer + cursor, item, floatTolerance)) {
+            return false;
+        }
+        if (!item.isWildcard) matches.push_back({chunkBase + cursor, i});
+        cursor += itemSize;
+    }
+    return !matches.empty();
+}
+
 std::vector<GroupItem> MemCore::parseGroupString(const std::string& groupStr,
                                                   MemDataType defaultType,
                                                   uint64_t& outRange) {
@@ -297,16 +409,25 @@ std::vector<GroupItem> MemCore::parseGroupString(const std::string& groupStr,
     }
     
     for (auto& raw : rawItems) {
-        raw.erase(0, raw.find_first_not_of(" \t\n\r"));
-        raw.erase(raw.find_last_not_of(" \t\n\r") + 1);
+        raw = trimGroupToken(raw);
         if (raw.empty()) continue;
         
         MemDataType itemType = getTypeFromSuffix(raw, defaultType);
+        stripGroupBytePrefix(raw, itemType);
         GroupItem item;
         item.type = itemType;
         item.relative = false;
+        item.isWildcard = false;
+        item.skipBytes = 0;
         memset(&item.value, 0, sizeof(item.value));
-        parseValue(raw, itemType, &item.value);
+        uint64_t skipBytes = 0;
+        if (parseGroupSkipToken(raw, skipBytes)) {
+            item.skipBytes = skipBytes;
+        } else if (isWildcardGroupToken(raw)) {
+            item.isWildcard = true;
+        } else {
+            parseValue(raw, itemType, &item.value);
+        }
         items.push_back(item);
     }
     return items;
@@ -522,6 +643,7 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
         std::vector<GroupItem> gItemsCopy = gItems;
         uint64_t groupRangeLocal = groupRange;
         bool groupAnchorModeLocal = _groupAnchorMode;
+        bool groupLayoutModeLocal = groupUsesLayoutMode(gItemsCopy);
         std::vector<ExcludedRange> excludedRangesCopy = searchExcludedRanges;
         addExcludedRange(excludedRangesCopy, &gItemsCopy, sizeof(gItemsCopy));
         if (!gItemsCopy.empty()) {
@@ -556,27 +678,60 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                            (mach_vm_address_t)memBuffer,
                                            &readSize) == KERN_SUCCESS) {
                     size_t limit;
-                    if (isStringTypeLocal && targetStringLenLocal > 0) {
+                    if (searchModeLocal == 2 && groupLayoutModeLocal) {
+                        limit = readSize > 0 ? readSize - 1 : 0;
+                    } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
+                        limit = readSize >= getSizeForType(gItemsCopy[0].type)
+                            ? readSize - getSizeForType(gItemsCopy[0].type) : 0;
+                    } else if (isStringTypeLocal && targetStringLenLocal > 0) {
                         limit = readSize >= targetStringLenLocal ? readSize - targetStringLenLocal : 0;
                     } else {
                         limit = readSize >= dataSizeLocal ? readSize - dataSizeLocal : 0;
                     }
                     size_t step = dataSizeLocal;
                     
-                    if (searchModeLocal == 2 && !gItemsCopy.empty()) {
+                    if (searchModeLocal == 2 && groupLayoutModeLocal) {
+                        step = 1;
+                        for (const auto& item : gItemsCopy) {
+                            if (item.skipBytes == 0) {
+                                step = item.isWildcard ? 1 : getSizeForType(item.type);
+                                break;
+                            }
+                        }
+                    } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
                         step = getSizeForType(gItemsCopy[0].type);
                     } else if (isStringTypeLocal) {
                         step = 1;
                     } else if (isAutoTypeLocal) {
                         step = (dataTypeInt == (int)MemDataType::FloatAuto) ? 4 : 1;
                     }
-                    
+
                     for (size_t k = 0; k <= limit; k += step) {
                         bool match = false;
                         uint64_t valBits = 0;
                         void* ptr = memBuffer + k;
                         size_t candidateSize = dataSizeLocal;
-                        if (searchModeLocal == 2 && !gItemsCopy.empty()) {
+                        if (searchModeLocal == 2 && groupLayoutModeLocal) {
+                            std::vector<std::pair<uint64_t, size_t>> matchedItems;
+                            if (matchGroupLayoutAt(memBuffer, readSize, k, gItemsCopy,
+                                                   floatTolerance, matchedItems, curr)) {
+                                for (const auto& matchedItem : matchedItems) {
+                                    uint64_t addr = matchedItem.first;
+                                    size_t itemIndex = matchedItem.second;
+                                    size_t valueSize = getSizeForType(gItemsCopy[itemIndex].type);
+                                    if (overlapsExcludedRange(localExcludedRanges, addr, valueSize)) continue;
+                                    RawResult res;
+                                    res.address = addr;
+                                    res.type = (uint8_t)gItemsCopy[itemIndex].type;
+                                    res.value = 0;
+                                    memcpy(&res.value, memBuffer + (addr - curr),
+                                           std::min((size_t)8, valueSize));
+                                    memset(res.padding, 0, sizeof(res.padding));
+                                    localResults.push_back(res);
+                                }
+                            }
+                            continue;
+                        } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
                             candidateSize = getSizeForType(gItemsCopy[0].type);
                         } else if (isStringTypeLocal && targetStringLenLocal > 0) {
                             candidateSize = targetStringLenLocal;
@@ -823,7 +978,12 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
             }
             
             size_t groupSize = gItems.size();
-            if (groupSize > 0 && allResults.size() >= groupSize) {
+            if (groupUsesLayoutMode(gItems)) {
+                std::sort(allResults.begin(), allResults.end(),
+                          [](const RawResult& a, const RawResult& b) {
+                              return a.address < b.address;
+                          });
+            } else if (groupSize > 0 && allResults.size() >= groupSize) {
                 std::vector<std::vector<RawResult>> groups;
                 for (size_t i = 0; i + groupSize <= allResults.size(); i += groupSize) {
                     std::vector<RawResult> group(allResults.begin() + i,

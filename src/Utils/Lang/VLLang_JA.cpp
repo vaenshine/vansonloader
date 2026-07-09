@@ -297,7 +297,7 @@ std::map<std::string, std::string> getLangJA() {
         {"Undo_Failed", "元に戻せませんでした"},
 
         // メモリ検索追加
-        {"Mem_GroupHint", "; または :: で値を区切る"},
+        {"Mem_GroupHint", ";, *, ?, w:8, :: で値を区切る"},
         {"Mem_BetweenHint", "範囲検索: 最小値~最大値 または 最小値-最大値"},
         {"Err_Not_Numeric", "有効な数値を入力してください"},
         {"Err_Range_Invalid", "範囲の形式が無効です"},
@@ -308,7 +308,7 @@ std::map<std::string, std::string> getLangJA() {
 
         // グループ検索ヘルプ
         {"Group_Help_Title", "グループ検索ガイド"},
-        {"Group_Help_Msg", "メモリ順序で複数の値を検索します。\n\n1. 基本（現在のタイプを使用）:\n   100; 200; 300\n   （値はこの順序で表示される必要があります）\n\n2. 混合タイプ（値+タイプ）:\n   100 i32; 0.5 f32; 10 i8\n   （サポート: i8, i16, i32, i64, f32, f64）\n\n3. 範囲を指定（末尾に :: を追加）:\n   10; 20::100\n   （次の値は100バイト以内）\n\n4. 区切り文字:\n   セミコロン (;) またはスペースを推奨"},
+        {"Group_Help_Msg", "メモリ順序で複数の値を検索します。\n\n1. 基本（現在のタイプを使用）:\n   100; 200; 300\n   （値はこの順序で表示される必要があります）\n\n2. 混合タイプ（値+タイプ）:\n   100 i32; 0.5 f32; 10 i8\n   （サポート: i8, i16, i32, i64, f32, f64）\n\n3. 範囲を指定（末尾に :: を追加）:\n   10; 20::100\n   （次の値は100バイト以内）\n\n4. 区切り文字:\n   セミコロン (;) またはスペースを推奨\n\n5. Wildcards:\n   1; *; 3::50\n   4:100 4:* 4:50\n   (* or ? matches any value with the current type size; 4:* matches any 4 bytes)\n\n6. Byte skip:\n   4:100 w:8 4:50\n   (w:8 skips 8 bytes before the next member)"},
 
         // 結果パネル
         {"Mem_Results", "検索結果"},
