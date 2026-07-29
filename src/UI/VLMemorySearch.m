@@ -471,6 +471,9 @@ static VLMemorySearchVC *g_memSearchVC = nil;
     _fuzzyRow1.frame = CGRectMake(margin, y, ctrlW, 28);
     _fuzzyRow1.hidden = YES;
     [self styleSegment:_fuzzyRow1 small:YES];
+    [_fuzzyRow1 addTarget:self
+                   action:@selector(onFuzzyRowSelected:)
+         forControlEvents:UIControlEventValueChanged];
     [_containerView addSubview:_fuzzyRow1];
     // fuzzyRow1显示时会占用这行，y在updateUIForMode中动态调整
     
@@ -1117,6 +1120,111 @@ static VLMemorySearchVC *g_memSearchVC = nil;
             } else {
                 [self logConsole:msg ?: VL(@"Mem_Error")];
             }
+        });
+    }];
+}
+
+- (void)onFuzzyRowSelected:(UISegmentedControl *)seg {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"fuzzyRepeatCustomEnabled"]) return;
+    if (!_isNextScan || !self.hasFuzzyBaseline || g_isSearching) return;
+    if (seg.selectedSegmentIndex == UISegmentedControlNoSegment) return;
+
+    VMemFilterMode modes[] = {VMemFilterModeIncreased, VMemFilterModeDecreased, VMemFilterModeUnchanged, VMemFilterModeChanged};
+    VMemFilterMode filterMode = modes[seg.selectedSegmentIndex];
+    [self showFuzzyRepeatPickerForMode:filterMode];
+}
+
+- (void)showFuzzyRepeatPickerForMode:(VMemFilterMode)filterMode {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:VL(@"Fuz_Repeat_Title")
+                                                                   message:VL(@"Fuz_Repeat_Message")
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    NSArray<NSNumber *> *counts = @[@5, @10, @20, @30];
+    for (NSNumber *num in counts) {
+        [sheet addAction:[UIAlertAction actionWithTitle:num.stringValue style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            [self executeFuzzyRepeatWithMode:filterMode total:num.integerValue];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:VL(@"Fuz_Repeat_Custom_Count") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+        [self showFuzzyRepeatCustomInput:filterMode];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction *a) {
+        self->_fuzzyRow1.selectedSegmentIndex = UISegmentedControlNoSegment;
+    }]];
+    if (sheet.popoverPresentationController) {
+        sheet.popoverPresentationController.sourceView = _fuzzyRow1;
+        sheet.popoverPresentationController.sourceRect = _fuzzyRow1.bounds;
+    }
+    UIViewController *root = GetSafeWindow().rootViewController;
+    while (root.presentedViewController) root = root.presentedViewController;
+    [root presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)showFuzzyRepeatCustomInput:(VMemFilterMode)filterMode {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:VL(@"Fuz_Repeat_Custom_Count")
+                                                                   message:VL(@"Fuz_Repeat_Message")
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
+        tf.placeholder = VL(@"Fuz_Repeat_Custom_Placeholder");
+        tf.keyboardType = UIKeyboardTypeNumberPad;
+        tf.text = @"5";
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction *a) {
+        self->_fuzzyRow1.selectedSegmentIndex = UISegmentedControlNoSegment;
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Confirm") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+        NSInteger total = alert.textFields.firstObject.text.integerValue;
+        if (total < 1) total = 1;
+        if (total > 100) total = 100;
+        [self executeFuzzyRepeatWithMode:filterMode total:total];
+    }]];
+    UIViewController *root = GetSafeWindow().rootViewController;
+    while (root.presentedViewController) root = root.presentedViewController;
+    [root presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)executeFuzzyRepeatWithMode:(VMemFilterMode)filterMode total:(NSInteger)total {
+    if (total < 1) total = 1;
+    g_isSearching = YES;
+    [self showLoading];
+    [self logConsole:[NSString stringWithFormat:VL(@"Fuz_Repeat_Running"), 0L, (long)total]];
+    [self runFuzzyRepeatStepWithMode:filterMode total:total completed:0 lastCount:[VMemEngine shared].resultCount];
+}
+
+- (void)runFuzzyRepeatStepWithMode:(VMemFilterMode)filterMode
+                             total:(NSInteger)total
+                         completed:(NSInteger)completed
+                         lastCount:(NSUInteger)lastCount {
+    if (completed >= total || lastCount == 0) {
+        g_isSearching = NO;
+        g_isFirstSearch = NO;
+        _fuzzyRow1.selectedSegmentIndex = UISegmentedControlNoSegment;
+        [self hideLoadingWithSuccess:(completed > 0 && lastCount > 0)];
+        [self logConsole:[NSString stringWithFormat:VL(@"Fuz_Repeat_Done"), (long)completed, (long)total]];
+        [self updateUIForMode];
+        [self loadResults];
+        if (lastCount > 0) [VLMemResults show];
+        return;
+    }
+
+    NSUInteger currentCount = [VMemEngine shared].resultCount;
+    if (filterMode == VMemFilterModeUnchanged && currentCount > 20000000) {
+        g_isSearching = NO;
+        _fuzzyRow1.selectedSegmentIndex = UISegmentedControlNoSegment;
+        [self hideLoadingWithSuccess:NO];
+        [self logConsole:VL(@"Fuz_Unchanged_TooMany")];
+        [self updateUIForMode];
+        return;
+    }
+
+    [self logConsole:[NSString stringWithFormat:VL(@"Fuz_Repeat_Running"), (long)(completed + 1), (long)total]];
+    [[VMemEngine shared] fastFuzzyFilterWithMode:filterMode type:g_currentType completion:^(NSUInteger count, NSString *msg) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSInteger nextCompleted = completed + 1;
+            if (count > 0) {
+                NSString *detail = [NSString stringWithFormat:@"%@ x%ld", [self timelineTypeName:g_currentType], (long)nextCompleted];
+                [self captureTimelineTitle:[self timelineFilterTitle:filterMode] detail:detail];
+            }
+            [self runFuzzyRepeatStepWithMode:filterMode total:total completed:nextCompleted lastCount:count];
         });
     }];
 }

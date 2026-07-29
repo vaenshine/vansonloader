@@ -195,6 +195,9 @@ std::map<std::string, std::string> getLangKO() {
         {"Mem_Browser", "브라우저"},
         {"Mem_Hex", "Hex"},
         {"Mem_Settings", "설정"},
+        {"Set_Fuzzy_Repeat", "Fuzzy Filter Count"},
+        {"Fuz_Repeat_Default", "Default"},
+        {"Fuz_Repeat_Custom", "Batch"},
         {"Mem_FloatTol", "부동소수점 허용오차"},
         {"Mem_GroupRange", "그룹 범위"},
         {"Mem_TakingSnapshot", "스냅샷 생성 중..."},
@@ -231,6 +234,12 @@ std::map<std::string, std::string> getLangKO() {
         {"Fuz_Search_OK", "검색 성공, 값을 변경 후 계속 검색"},
         {"Fuz_Unchanged_TooMany", "결과가 너무 많습니다, 먼저 범위를 좁히세요"},
         {"Fuz_First_Hint", "검색을 클릭하여 시작"},
+        {"Fuz_Repeat_Title", "Filter Count"},
+        {"Fuz_Repeat_Message", "Run the current fuzzy filter repeatedly"},
+        {"Fuz_Repeat_Custom_Count", "Custom Count"},
+        {"Fuz_Repeat_Custom_Placeholder", "1-100"},
+        {"Fuz_Repeat_Running", "Fuzzy filtering %ld/%ld"},
+        {"Fuz_Repeat_Done", "Fuzzy filters complete %ld/%ld"},
 
         // 필터 패널
         {"Filter_Btn", "필터"},

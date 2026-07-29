@@ -195,6 +195,9 @@ std::map<std::string, std::string> getLangTW() {
         {"Mem_Browser", "瀏覽"},
         {"Mem_Hex", "Hex"},
         {"Mem_Settings", "設定"},
+        {"Set_Fuzzy_Repeat", "模糊篩選次數"},
+        {"Fuz_Repeat_Default", "預設"},
+        {"Fuz_Repeat_Custom", "批量"},
         {"Mem_FloatTol", "浮點容差"},
         {"Mem_GroupRange", "聯合搜尋範圍"},
         {"Mem_TakingSnapshot", "正在打快照..."},
@@ -231,6 +234,12 @@ std::map<std::string, std::string> getLangTW() {
         {"Fuz_Search_OK", "搜尋成功，改變數值後繼續搜尋"},
         {"Fuz_Unchanged_TooMany", "結果過多，請先縮小範圍"},
         {"Fuz_First_Hint", "點擊搜尋開始"},
+        {"Fuz_Repeat_Title", "選擇篩選次數"},
+        {"Fuz_Repeat_Message", "按目前模糊條件連續篩選"},
+        {"Fuz_Repeat_Custom_Count", "自訂次數"},
+        {"Fuz_Repeat_Custom_Placeholder", "1-100"},
+        {"Fuz_Repeat_Running", "模糊篩選 %ld/%ld"},
+        {"Fuz_Repeat_Done", "模糊篩選完成 %ld/%ld"},
 
         // 篩選面板
         {"Filter_Btn", "篩選"},

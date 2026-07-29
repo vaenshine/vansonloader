@@ -319,6 +319,15 @@ static double VLPanelParseDoubleSetting(NSString *text, double fallback) {
     [self styleSettingField:_floatToleranceField];
     [searchBox addSubview:_floatToleranceField];
 
+    CGRect repeatFrame = CGRectMake(settingsRightX, bottomY, cellW, settingCellH);
+    addSettingLabel(VL(@"Set_Fuzzy_Repeat"), repeatFrame);
+    _fuzzyRepeatSeg = [[UISegmentedControl alloc] initWithItems:@[VL(@"Fuz_Repeat_Default"), VL(@"Fuz_Repeat_Custom")]];
+    _fuzzyRepeatSeg.frame = CGRectMake(repeatFrame.origin.x, repeatFrame.origin.y + 20, repeatFrame.size.width, btnH);
+    _fuzzyRepeatSeg.selectedSegmentIndex = [def boolForKey:@"fuzzyRepeatCustomEnabled"] ? 1 : 0;
+    [self styleSegment:_fuzzyRepeatSeg];
+    [_fuzzyRepeatSeg addTarget:self action:@selector(onFuzzyRepeatChanged:) forControlEvents:UIControlEventValueChanged];
+    [searchBox addSubview:_fuzzyRepeatSeg];
+
     [_toolsScroll addSubview:searchBox];
     y += searchSettingsH + gap;
 
@@ -706,6 +715,14 @@ static double VLPanelParseDoubleSetting(NSString *text, double fallback) {
     [def setBool:anchorMode forKey:@"groupAnchorMode"];
     [def synchronize];
     [VMemEngine shared].groupAnchorMode = anchorMode;
+    showToast(VL(@"Msg_Saved"));
+}
+
+- (void)onFuzzyRepeatChanged:(UISegmentedControl *)seg {
+    BOOL enabled = (seg.selectedSegmentIndex == 1);
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+    [def setBool:enabled forKey:@"fuzzyRepeatCustomEnabled"];
+    [def synchronize];
     showToast(VL(@"Msg_Saved"));
 }
 

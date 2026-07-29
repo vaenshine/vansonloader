@@ -177,6 +177,7 @@ static inline UIColor *VLStrokeColor(void) {
 @property (nonatomic, strong) UITextField *groupRangeField;
 @property (nonatomic, strong) UITextField *floatToleranceField;
 @property (nonatomic, strong) UISegmentedControl *groupModeSeg;
+@property (nonatomic, strong) UISegmentedControl *fuzzyRepeatSeg;
 
 // ═══ 关于Tab ═══
 @property (nonatomic, strong) UIScrollView *aboutScroll;

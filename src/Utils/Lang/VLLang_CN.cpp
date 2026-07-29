@@ -195,6 +195,9 @@ std::map<std::string, std::string> getLangCN() {
         {"Mem_Browser", "浏览"},
         {"Mem_Hex", "Hex"},
         {"Mem_Settings", "设置"},
+        {"Set_Fuzzy_Repeat", "模糊筛选次数"},
+        {"Fuz_Repeat_Default", "默认"},
+        {"Fuz_Repeat_Custom", "批量"},
         {"Mem_FloatTol", "浮点容差"},
         {"Mem_GroupRange", "联合搜索范围"},
         {"Mem_TakingSnapshot", "正在打快照..."},
@@ -231,6 +234,12 @@ std::map<std::string, std::string> getLangCN() {
         {"Fuz_Search_OK", "搜索成功，改变数值后继续搜索"},
         {"Fuz_Unchanged_TooMany", "结果过多，请先缩小范围"},
         {"Fuz_First_Hint", "点击搜索开始"},
+        {"Fuz_Repeat_Title", "选择筛选次数"},
+        {"Fuz_Repeat_Message", "按当前模糊条件连续筛选"},
+        {"Fuz_Repeat_Custom_Count", "自定义次数"},
+        {"Fuz_Repeat_Custom_Placeholder", "1-100"},
+        {"Fuz_Repeat_Running", "模糊筛选 %ld/%ld"},
+        {"Fuz_Repeat_Done", "模糊筛选完成 %ld/%ld"},
 
         // 筛选面板
         {"Filter_Btn", "筛选"},

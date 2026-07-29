@@ -195,6 +195,9 @@ std::map<std::string, std::string> getLangEN() {
         {"Mem_Browser", "Browse"},
         {"Mem_Hex", "Hex"},
         {"Mem_Settings", "Settings"},
+        {"Set_Fuzzy_Repeat", "Fuzzy Filter Count"},
+        {"Fuz_Repeat_Default", "Default"},
+        {"Fuz_Repeat_Custom", "Batch"},
         {"Mem_FloatTol", "Float Tolerance"},
         {"Mem_GroupRange", "Group Range"},
         {"Mem_TakingSnapshot", "Taking snapshot..."},
@@ -231,6 +234,12 @@ std::map<std::string, std::string> getLangEN() {
         {"Fuz_Search_OK", "Search successful, change value then continue searching"},
         {"Fuz_Unchanged_TooMany", "Too many results, narrow down first"},
         {"Fuz_First_Hint", "Click search to start"},
+        {"Fuz_Repeat_Title", "Filter Count"},
+        {"Fuz_Repeat_Message", "Run the current fuzzy filter repeatedly"},
+        {"Fuz_Repeat_Custom_Count", "Custom Count"},
+        {"Fuz_Repeat_Custom_Placeholder", "1-100"},
+        {"Fuz_Repeat_Running", "Fuzzy filtering %ld/%ld"},
+        {"Fuz_Repeat_Done", "Fuzzy filters complete %ld/%ld"},
 
         // Filter Panel
         {"Filter_Btn", "Filter"},

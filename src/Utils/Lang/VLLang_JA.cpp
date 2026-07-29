@@ -195,6 +195,9 @@ std::map<std::string, std::string> getLangJA() {
         {"Mem_Browser", "ブラウズ"},
         {"Mem_Hex", "Hex"},
         {"Mem_Settings", "設定"},
+        {"Set_Fuzzy_Repeat", "Fuzzy Filter Count"},
+        {"Fuz_Repeat_Default", "Default"},
+        {"Fuz_Repeat_Custom", "Batch"},
         {"Mem_FloatTol", "浮動小数点許容差"},
         {"Mem_GroupRange", "グループ範囲"},
         {"Mem_TakingSnapshot", "スナップショット作成中..."},
@@ -231,6 +234,12 @@ std::map<std::string, std::string> getLangJA() {
         {"Fuz_Search_OK", "検索成功、値を変更して検索を続行"},
         {"Fuz_Unchanged_TooMany", "結果が多すぎます、先に絞り込んでください"},
         {"Fuz_First_Hint", "検索をクリックして開始"},
+        {"Fuz_Repeat_Title", "Filter Count"},
+        {"Fuz_Repeat_Message", "Run the current fuzzy filter repeatedly"},
+        {"Fuz_Repeat_Custom_Count", "Custom Count"},
+        {"Fuz_Repeat_Custom_Placeholder", "1-100"},
+        {"Fuz_Repeat_Running", "Fuzzy filtering %ld/%ld"},
+        {"Fuz_Repeat_Done", "Fuzzy filters complete %ld/%ld"},
 
         // フィルタパネル
         {"Filter_Btn", "フィルタ"},
