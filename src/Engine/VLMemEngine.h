@@ -71,6 +71,11 @@ typedef NS_ENUM(NSUInteger, VMemFilterMode) {
 @property (nonatomic, strong) NSDate *date;
 @end
 
+@interface VLMemWriteUndoBatch : NSObject
+@property (nonatomic, strong) NSMutableArray<VLMemWriteUndoItem *> *items;
+@property (nonatomic, strong) NSDate *date;
+@end
+
 // Backward compatibility
 typedef VLMemResultItem VMemResultItem;
 
@@ -135,6 +140,8 @@ typedef VLMemResultItem VMemResultItem;
                            detail:(NSString *)detail
                          dataType:(VMemDataType)type;
 - (BOOL)restoreTimelineAtIndex:(NSUInteger)index;
+- (BOOL)canRestoreTimelineValuesAtIndex:(NSUInteger)index;
+- (NSUInteger)restoreTimelineValuesAtIndex:(NSUInteger)index;
 - (void)removeTimelineAtIndex:(NSUInteger)index;
 - (void)clearTimeline;
 
@@ -146,7 +153,18 @@ typedef VLMemResultItem VMemResultItem;
 - (nullable VLMemWriteUndoItem *)lastManualWriteUndoForAddress:(uint64_t)address
                                                           type:(VMemDataType)type;
 - (BOOL)undoLastManualWriteForAddress:(uint64_t)address type:(VMemDataType)type;
+- (NSUInteger)performManualBatchWrites:(NSArray<NSDictionary *> *)writes;
+- (BOOL)canUndoLastManualWriteBatch;
+- (NSUInteger)lastManualWriteBatchCount;
+- (NSUInteger)undoLastManualWriteBatch;
 - (void)clearManualWriteUndo;
+
+- (NSUInteger)captureValueSnapshotForKey:(NSString *)key
+                                    items:(NSArray<NSDictionary *> *)items;
+- (BOOL)hasValueSnapshotForKey:(NSString *)key;
+- (NSUInteger)valueSnapshotCountForKey:(NSString *)key;
+- (NSUInteger)restoreValueSnapshotForKey:(NSString *)key;
+- (void)clearAllValueSnapshots;
 
 - (void)batchModifyWithValue:(NSString *)value
                        limit:(NSInteger)limit

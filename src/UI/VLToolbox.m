@@ -217,6 +217,7 @@ extern BOOL g_touchPassthroughMode;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIButton *refreshBtn;
 @property (nonatomic, strong) UIButton *importBtn;
+@property (nonatomic, strong) UIButton *snapshotBtn;
 @property (nonatomic, strong) UILabel *pageLabel;
 @property (nonatomic, strong) UIButton *prevBtn;
 @property (nonatomic, strong) UIButton *nextBtn;
@@ -486,10 +487,10 @@ static void VLToolbox_RegisterGlobalNotifications(void) {
     [_nextBtn addTarget:self action:@selector(nextPage) forControlEvents:UIControlEventTouchUpInside];
     [_panelView addSubview:_nextBtn];
     
-    // 底部按钮区域 - 导入 + 刷新
-    CGFloat btnW = 90;
-    CGFloat btnSpacing = 12;
-    CGFloat totalBtnW = btnW * 2 + btnSpacing;
+    // 底部按钮区域 - 导入 + 快照 + 刷新
+    CGFloat btnW = 82;
+    CGFloat btnSpacing = 8;
+    CGFloat totalBtnW = btnW * 3 + btnSpacing * 2;
     CGFloat btnStartX = (w - totalBtnW) / 2;
     
     // 导入按钮
@@ -504,10 +505,22 @@ static void VLToolbox_RegisterGlobalNotifications(void) {
     _importBtn.backgroundColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.08];
     [_importBtn addTarget:self action:@selector(onImport) forControlEvents:UIControlEventTouchUpInside];
     [_panelView addSubview:_importBtn];
+
+    _snapshotBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    _snapshotBtn.frame = CGRectMake(btnStartX + btnW + btnSpacing, h - 42, btnW, 32);
+    [_snapshotBtn setTitle:VL(@"Snapshot_Button") forState:UIControlStateNormal];
+    [_snapshotBtn setTitleColor:[UIColor systemOrangeColor] forState:UIControlStateNormal];
+    _snapshotBtn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
+    _snapshotBtn.layer.borderColor = [UIColor systemOrangeColor].CGColor;
+    _snapshotBtn.layer.borderWidth = 1;
+    _snapshotBtn.layer.cornerRadius = 16;
+    _snapshotBtn.backgroundColor = [[UIColor systemOrangeColor] colorWithAlphaComponent:0.08];
+    [_snapshotBtn addTarget:self action:@selector(onValueSnapshot) forControlEvents:UIControlEventTouchUpInside];
+    [_panelView addSubview:_snapshotBtn];
     
     // 刷新按钮 - cyan 风格
     _refreshBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    _refreshBtn.frame = CGRectMake(btnStartX + btnW + btnSpacing, h - 42, btnW, 32);
+    _refreshBtn.frame = CGRectMake(btnStartX + (btnW + btnSpacing) * 2, h - 42, btnW, 32);
     [_refreshBtn setTitle:VL(@"Btn_Refresh") forState:UIControlStateNormal];
     [_refreshBtn setTitleColor:[UIColor cyanColor] forState:UIControlStateNormal];
     _refreshBtn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
@@ -525,6 +538,7 @@ static void VLToolbox_RegisterGlobalNotifications(void) {
 - (void)tabChanged {
     _currentTab = _tabSeg.selectedSegmentIndex;
     _currentPage = 0; // 切换 tab 时重置页码
+    _snapshotBtn.hidden = _currentTab != 0;
     [self updatePanelHeight];
     [_tableView reloadData];
     [self updatePageLabel];
@@ -534,6 +548,48 @@ static void VLToolbox_RegisterGlobalNotifications(void) {
     [self updatePanelHeight];
     [_tableView reloadData];
     [self updatePageLabel];
+}
+
+- (void)onValueSnapshot {
+    static NSString * const snapshotKey = @"toolbox-memory";
+    VMemEngine *engine = [VMemEngine shared];
+    NSMutableArray<NSDictionary *> *items = [NSMutableArray array];
+    for (VLToolboxMemItem *item in g_toolboxMemResults) {
+        [items addObject:@{@"address": @(item.address), @"type": @(item.dataType)}];
+    }
+
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:VL(@"Snapshot_Title")
+                                                                    message:nil
+                                                             preferredStyle:UIAlertControllerStyleActionSheet];
+    [sheet addAction:[UIAlertAction actionWithTitle:VL(@"Snapshot_Save")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(__unused UIAlertAction *action) {
+        NSUInteger count = [engine captureValueSnapshotForKey:snapshotKey items:items];
+        NSString *format = count > 0 ? VL(@"Snapshot_Saved_Fmt") : VL(@"Snapshot_Empty");
+        showToast(count > 0 ? [NSString stringWithFormat:format, (unsigned long)count] : format);
+    }]];
+
+    UIAlertAction *restore = [UIAlertAction actionWithTitle:VL(@"Snapshot_Restore")
+                                                       style:UIAlertActionStyleDefault
+                                                     handler:^(__unused UIAlertAction *action) {
+        NSUInteger count = [engine restoreValueSnapshotForKey:snapshotKey];
+        for (VLToolboxMemItem *item in g_toolboxMemResults) {
+            NSString *value = [engine readAddress:item.address type:item.dataType];
+            if (value) {
+                item.currentValue = value;
+                if (item.isLocked) item.lockValue = value;
+            }
+        }
+        [self.tableView reloadData];
+        NSString *format = count > 0 ? VL(@"Snapshot_Restored_Fmt") : VL(@"Timeline_Restore_Failed");
+        showToast(count > 0 ? [NSString stringWithFormat:format, (unsigned long)count] : format);
+    }];
+    restore.enabled = [engine hasValueSnapshotForKey:snapshotKey];
+    [sheet addAction:restore];
+    [sheet addAction:[UIAlertAction actionWithTitle:VL(@"Btn_Cancel")
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
 }
 
 #pragma mark - Pagination
@@ -633,12 +689,13 @@ static void VLToolbox_RegisterGlobalNotifications(void) {
         self->_pageLabel.frame = CGRectMake(54, pageY, w - 108, 28);
         self->_nextBtn.frame = CGRectMake(w - 48, pageY, 36, 28);
         
-        CGFloat btnW = 90;
-        CGFloat btnSpacing = 12;
-        CGFloat totalBtnW = btnW * 2 + btnSpacing;
+        CGFloat btnW = 82;
+        CGFloat btnSpacing = 8;
+        CGFloat totalBtnW = btnW * 3 + btnSpacing * 2;
         CGFloat btnStartX = (w - totalBtnW) / 2;
         self->_importBtn.frame = CGRectMake(btnStartX, h - 42, btnW, 32);
-        self->_refreshBtn.frame = CGRectMake(btnStartX + btnW + btnSpacing, h - 42, btnW, 32);
+        self->_snapshotBtn.frame = CGRectMake(btnStartX + btnW + btnSpacing, h - 42, btnW, 32);
+        self->_refreshBtn.frame = CGRectMake(btnStartX + (btnW + btnSpacing) * 2, h - 42, btnW, 32);
         
         // 更新最小化按钮位置
         UIButton *minBtn = [self->_panelView viewWithTag:101];
@@ -764,6 +821,7 @@ static void VLToolbox_RegisterGlobalNotifications(void) {
     _tabSeg.selectedSegmentIndex = _currentTab;
     [_refreshBtn setTitle:VL(@"Btn_Refresh") forState:UIControlStateNormal];
     [_importBtn setTitle:VL(@"Btn_Import") forState:UIControlStateNormal];
+    [_snapshotBtn setTitle:VL(@"Snapshot_Button") forState:UIControlStateNormal];
     [_tableView reloadData];
 }
 

@@ -73,6 +73,8 @@ public:
     
     void setStoragePath(const std::string& path, const std::string& swapPath);
     bool restoreResultsFromFile(const std::string& filePath, size_t resultCount);
+    size_t restoreValuesFromFile(const std::string& filePath,
+                                 size_t resultCount, size_t maxCount);
     
     // ========== 特征码搜索 ==========
     SignatureData parseSignature(const std::string& sig);

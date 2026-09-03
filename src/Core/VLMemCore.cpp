@@ -468,6 +468,31 @@ bool MemCore::restoreResultsFromFile(const std::string& filePath, size_t resultC
     return true;
 }
 
+size_t MemCore::restoreValuesFromFile(const std::string& filePath,
+                                      size_t resultCount,
+                                      size_t maxCount) {
+    if (_task == MACH_PORT_NULL || filePath.empty() || resultCount == 0 ||
+        resultCount > maxCount) return 0;
+
+    FILE *file = fopen(filePath.c_str(), "rb");
+    if (!file) return 0;
+
+    size_t restored = 0;
+    RawResult raw;
+    for (size_t index = 0;
+         index < resultCount && fread(&raw, sizeof(RawResult), 1, file) == 1;
+         index++) {
+        MemDataType type = (MemDataType)raw.type;
+        if (type == MemDataType::String || type == MemDataType::IntAuto ||
+            type == MemDataType::UIntAuto || type == MemDataType::FloatAuto ||
+            raw.type > (uint8_t)MemDataType::FloatAuto) continue;
+        size_t size = getSizeForType(type);
+        if (writeMem(raw.address, &raw.value, size)) restored++;
+    }
+    fclose(file);
+    return restored;
+}
+
 
 // ============================================================================
 // 首次搜索

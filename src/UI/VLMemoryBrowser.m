@@ -257,6 +257,7 @@ static NSAttributedString *VLBrowserAddressText(uint64_t address, uint64_t targe
 #define PAGE_COUNT 50
 #define MAX_BUFFER_ROWS 500
 #define PRELOAD_THRESHOLD 200
+#define STR_PRELOAD_THRESHOLD 100
 #define NUMERIC_REFRESH_INTERVAL 0.5
 #define STRING_REFRESH_INTERVAL 1.0
 
@@ -496,6 +497,9 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     _tableView.dataSource = self;
     _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     _tableView.rowHeight = 48;
+    _tableView.decelerationRate = _isStrMode
+        ? UIScrollViewDecelerationRateFast
+        : UIScrollViewDecelerationRateNormal;
     [_panelView addSubview:_tableView];
 }
 
@@ -511,6 +515,11 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
         default: _typeSize = 1; break; // Hex
     }
     _isStrMode = (_typeSeg.selectedSegmentIndex == 5);
+    if (_tableView) {
+        _tableView.decelerationRate = _isStrMode
+            ? UIScrollViewDecelerationRateFast
+            : UIScrollViewDecelerationRateNormal;
+    }
 }
 
 - (VMemDataType)currentType {
@@ -731,9 +740,11 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     CGFloat contentH = scrollView.contentSize.height;
     
     if (_isStrMode) {
-        if (y < PRELOAD_THRESHOLD) {
+        if (!scrollView.isDragging) return;
+        CGFloat velocityY = [scrollView.panGestureRecognizer velocityInView:scrollView].y;
+        if (y < STR_PRELOAD_THRESHOLD && velocityY > 0) {
             [self loadMoreStrData:NO];
-        } else if (y > contentH - h - PRELOAD_THRESHOLD) {
+        } else if (y > contentH - h - STR_PRELOAD_THRESHOLD && velocityY < 0) {
             [self loadMoreStrData:YES];
         }
         return;
@@ -747,6 +758,22 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
     else if (y > contentH - h - PRELOAD_THRESHOLD) {
         [self loadMoreData:YES];
     }
+}
+
+- (void)scrollViewWillEndDragging:(UIScrollView *)scrollView
+                     withVelocity:(CGPoint)velocity
+              targetContentOffset:(inout CGPoint *)targetContentOffset {
+    if (!_isStrMode || !targetContentOffset) return;
+
+    CGFloat currentY = scrollView.contentOffset.y;
+    CGFloat rowHeight = _tableView.rowHeight;
+    CGFloat maxTravel = MAX(rowHeight * 3.0, scrollView.bounds.size.height * 0.75);
+    CGFloat minY = -scrollView.adjustedContentInset.top;
+    CGFloat maxY = MAX(minY, scrollView.contentSize.height - scrollView.bounds.size.height +
+                             scrollView.adjustedContentInset.bottom);
+    CGFloat limitedY = MIN(MAX(targetContentOffset->y, currentY - maxTravel),
+                           currentY + maxTravel);
+    targetContentOffset->y = MIN(MAX(limitedY, minY), maxY);
 }
 
 - (void)loadMoreData:(BOOL)next {

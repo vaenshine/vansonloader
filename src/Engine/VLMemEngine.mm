@@ -66,6 +66,8 @@ static double VLParseDoubleSetting(NSString *text, double fallback) {
 @end
 @implementation VLMemWriteUndoItem
 @end
+@implementation VLMemWriteUndoBatch
+@end
 
 @interface VLMemEngine () {
     std::unique_ptr<vcore::MemCore> _core;
@@ -73,6 +75,8 @@ static double VLParseDoubleSetting(NSString *text, double fallback) {
 @property (nonatomic, copy) NSString *resultFilePath;
 @property (nonatomic, strong) NSMutableArray<VLMemTimelineItem *> *timeline;
 @property (nonatomic, strong) NSMutableArray<VLMemWriteUndoItem *> *manualWriteUndoStack;
+@property (nonatomic, strong) NSMutableArray<VLMemWriteUndoBatch *> *manualWriteUndoBatches;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, VLMemWriteUndoBatch *> *valueSnapshots;
 @end
 
 @implementation VLMemEngine
@@ -98,6 +102,8 @@ static double VLParseDoubleSetting(NSString *text, double fallback) {
         _resultFilePath = [pathA copy];
         _timeline = [NSMutableArray array];
         _manualWriteUndoStack = [NSMutableArray array];
+        _manualWriteUndoBatches = [NSMutableArray array];
+        _valueSnapshots = [NSMutableDictionary dictionary];
         
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
 
@@ -124,6 +130,7 @@ static double VLParseDoubleSetting(NSString *text, double fallback) {
     }
     [self clearTimeline];
     [self clearManualWriteUndo];
+    [self clearAllValueSnapshots];
     NSString *tmpDir = NSTemporaryDirectory();
     [[NSFileManager defaultManager] removeItemAtPath:[tmpDir stringByAppendingPathComponent:@"vmem_scan_a.bin"] error:nil];
     [[NSFileManager defaultManager] removeItemAtPath:[tmpDir stringByAppendingPathComponent:@"vmem_scan_b.bin"] error:nil];
@@ -427,6 +434,21 @@ static vcore::MemDataType toMemDataType(VMemDataType type) {
     return ok;
 }
 
+- (BOOL)canRestoreTimelineValuesAtIndex:(NSUInteger)index {
+    if (index >= self.timeline.count) return NO;
+    NSUInteger count = self.timeline[index].resultCount;
+    return count > 0 && count <= 10000 && _core->isReady();
+}
+
+- (NSUInteger)restoreTimelineValuesAtIndex:(NSUInteger)index {
+    if (![self canRestoreTimelineValuesAtIndex:index]) return 0;
+    VLMemTimelineItem *item = self.timeline[index];
+    if (item.filePath.length == 0 ||
+        ![[NSFileManager defaultManager] fileExistsAtPath:item.filePath]) return 0;
+    return _core->restoreValuesFromFile([item.filePath UTF8String],
+                                        item.resultCount, 10000);
+}
+
 - (void)removeTimelineAtIndex:(NSUInteger)index {
     if (index >= self.timeline.count) return;
     VLMemTimelineItem *item = self.timeline[index];
@@ -486,15 +508,185 @@ static vcore::MemDataType toMemDataType(VMemDataType type) {
 
 - (void)clearManualWriteUndo {
     [self.manualWriteUndoStack removeAllObjects];
+    [self.manualWriteUndoBatches removeAllObjects];
+}
+
+- (NSUInteger)writeSizeForType:(VMemDataType)type
+                      oldValue:(NSString *)oldValue
+                      newValue:(NSString *)newValue {
+    if (type == VMemDataTypeString) {
+        NSUInteger oldLen = [oldValue lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        NSUInteger newLen = [newValue lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        return MAX((NSUInteger)1, MAX(oldLen, newLen) + 1);
+    }
+    return vcore::getSizeForType(toMemDataType(type));
+}
+
+- (NSUInteger)performManualBatchWrites:(NSArray<NSDictionary *> *)writes {
+    if (writes.count == 0 || !_core->isReady()) return 0;
+
+    VLMemWriteUndoBatch *batch = [VLMemWriteUndoBatch new];
+    batch.items = [NSMutableArray array];
+    batch.date = [NSDate date];
+    NSMutableSet<NSString *> *captured = [NSMutableSet set];
+    NSUInteger successCount = 0;
+
+    for (NSDictionary *write in writes) {
+        uint64_t address = [write[@"address"] unsignedLongLongValue];
+        VMemDataType type = (VMemDataType)[write[@"type"] unsignedIntegerValue];
+        NSString *newValue = write[@"value"];
+        if (address == 0 || newValue.length == 0) continue;
+
+        NSString *oldValue = [self readAddress:address type:type] ?: @"";
+        NSUInteger size = [self writeSizeForType:type oldValue:oldValue newValue:newValue];
+        NSData *oldData = [self readMemory:address length:size];
+        if (!oldData) continue;
+
+        if ([self writeAddress:address value:newValue type:type]) {
+            successCount++;
+            NSString *key = [NSString stringWithFormat:@"%llX-%lu", address,
+                                                       (unsigned long)type];
+            if (![captured containsObject:key]) {
+                VLMemWriteUndoItem *item = [VLMemWriteUndoItem new];
+                item.address = address;
+                item.type = type;
+                item.oldValue = oldValue;
+                item.writtenValue = newValue;
+                item.oldData = oldData;
+                item.date = batch.date;
+                [batch.items addObject:item];
+                [captured addObject:key];
+            }
+        }
+    }
+
+    if (batch.items.count > 0) {
+        [self.manualWriteUndoBatches insertObject:batch atIndex:0];
+        while (self.manualWriteUndoBatches.count > 10)
+            [self.manualWriteUndoBatches removeLastObject];
+    }
+    return successCount;
+}
+
+- (BOOL)canUndoLastManualWriteBatch {
+    return self.manualWriteUndoBatches.firstObject.items.count > 0;
+}
+
+- (NSUInteger)lastManualWriteBatchCount {
+    return self.manualWriteUndoBatches.firstObject.items.count;
+}
+
+- (NSUInteger)undoLastManualWriteBatch {
+    VLMemWriteUndoBatch *batch = self.manualWriteUndoBatches.firstObject;
+    if (!batch) return 0;
+
+    NSMutableArray<VLMemWriteUndoItem *> *failed = [NSMutableArray array];
+    NSUInteger restored = 0;
+    for (VLMemWriteUndoItem *item in [batch.items reverseObjectEnumerator]) {
+        if ([self writeMemory:item.address data:item.oldData]) restored++;
+        else [failed addObject:item];
+    }
+    if (failed.count == 0) [self.manualWriteUndoBatches removeObjectAtIndex:0];
+    else batch.items = failed;
+    return restored;
+}
+
+- (NSUInteger)captureValueSnapshotForKey:(NSString *)key
+                                    items:(NSArray<NSDictionary *> *)items {
+    if (key.length == 0 || items.count == 0 || !_core->isReady()) return 0;
+
+    VLMemWriteUndoBatch *snapshot = [VLMemWriteUndoBatch new];
+    snapshot.items = [NSMutableArray array];
+    snapshot.date = [NSDate date];
+    NSMutableSet<NSString *> *captured = [NSMutableSet set];
+
+    for (NSDictionary *entry in items) {
+        uint64_t address = [entry[@"address"] unsignedLongLongValue];
+        VMemDataType type = (VMemDataType)[entry[@"type"] unsignedIntegerValue];
+        if (address == 0) continue;
+
+        NSString *identity = [NSString stringWithFormat:@"%llX-%lu", address,
+                                                       (unsigned long)type];
+        if ([captured containsObject:identity]) continue;
+
+        NSString *value = [self readAddress:address type:type];
+        if (!value) continue;
+        NSUInteger size = [self writeSizeForType:type oldValue:value newValue:value];
+        NSData *data = [self readMemory:address length:size];
+        if (!data) continue;
+
+        VLMemWriteUndoItem *item = [VLMemWriteUndoItem new];
+        item.address = address;
+        item.type = type;
+        item.oldValue = value;
+        item.writtenValue = value;
+        item.oldData = data;
+        item.date = snapshot.date;
+        [snapshot.items addObject:item];
+        [captured addObject:identity];
+    }
+
+    if (snapshot.items.count > 0) self.valueSnapshots[key] = snapshot;
+    return snapshot.items.count;
+}
+
+- (BOOL)hasValueSnapshotForKey:(NSString *)key {
+    return self.valueSnapshots[key].items.count > 0;
+}
+
+- (NSUInteger)valueSnapshotCountForKey:(NSString *)key {
+    return self.valueSnapshots[key].items.count;
+}
+
+- (NSUInteger)restoreValueSnapshotForKey:(NSString *)key {
+    VLMemWriteUndoBatch *snapshot = self.valueSnapshots[key];
+    if (!snapshot) return 0;
+
+    NSUInteger restored = 0;
+    for (VLMemWriteUndoItem *item in snapshot.items) {
+        if ([self writeMemory:item.address data:item.oldData]) restored++;
+    }
+    return restored;
+}
+
+- (void)clearAllValueSnapshots {
+    [self.valueSnapshots removeAllObjects];
+}
+
+- (NSString *)batchValueFromInput:(NSString *)input
+                            index:(NSUInteger)index
+                             type:(VMemDataType)type
+                             mode:(int)mode {
+    if (mode != 1) return input;
+    if (type == VMemDataTypeF32 || type == VMemDataTypeF64)
+        return [NSString stringWithFormat:@"%g", [input doubleValue] + index];
+    return [NSString stringWithFormat:@"%lld", [input longLongValue] + (long long)index];
 }
 
 - (void)batchModifyWithValue:(NSString *)value
                        limit:(NSInteger)limit
                         type:(VMemDataType)type
                         mode:(int)mode {
-    vcore::MemDataType coreType = toMemDataType(type);
-    std::string cVal = [value UTF8String] ?: "";
-    _core->batchModify(cVal, (int)limit, coreType, mode);
+    NSUInteger count = self.resultCount;
+    if (limit > 0) count = MIN(count, (NSUInteger)limit);
+    if (count <= 10000) {
+        NSMutableArray<NSDictionary *> *writes = [NSMutableArray arrayWithCapacity:count];
+        for (NSUInteger i = 0; i < count; i++) {
+            VLMemResultItem *item = [self getResultAtIndex:i type:type];
+            if (!item) continue;
+            VMemDataType actualType = item.type <= VMemDataTypeF64 ? item.type : type;
+            [writes addObject:@{
+                @"address": @(item.address),
+                @"type": @(actualType),
+                @"value": [self batchValueFromInput:value index:i type:actualType mode:mode]
+            }];
+        }
+        [self performManualBatchWrites:writes];
+    } else {
+        vcore::MemDataType coreType = toMemDataType(type);
+        std::string cVal = [value UTF8String] ?: "";
+        _core->batchModify(cVal, (int)limit, coreType, mode);
+    }
 }
 
 #pragma mark - 内存读写

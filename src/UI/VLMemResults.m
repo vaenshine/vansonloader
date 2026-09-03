@@ -455,6 +455,32 @@ static VLMemResultsImpl *g_memResults = nil;
     return @"?";
 }
 
+- (void)promptRestoreTimelineValuesAtIndex:(NSUInteger)index {
+    VMemEngine *engine = [VMemEngine shared];
+    if (![engine canRestoreTimelineValuesAtIndex:index]) return;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:VL(@"Timeline_Restore_Values_Title")
+                                                                       message:VL(@"Timeline_Restore_Values_Msg")
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:VL(@"Timeline_Restore_Values_Action")
+                                                    style:UIAlertActionStyleDefault
+                                                  handler:^(UIAlertAction *action) {
+            NSUInteger restored = [engine restoreTimelineValuesAtIndex:index];
+            [self loadResults];
+            showToast(restored > 0
+                ? [NSString stringWithFormat:VL(@"Timeline_Restore_Values_Success_Fmt"), (unsigned long)restored]
+                : VL(@"Timeline_Restore_Failed"));
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"VLMemResultsDidRestore" object:nil];
+        }]];
+        UIViewController *root = GetSafeWindow().rootViewController;
+        while (root.presentedViewController) root = root.presentedViewController;
+        [root presentViewController:alert animated:YES completion:nil];
+    });
+}
+
 - (void)showTimelineSheet {
     NSArray<VLMemTimelineItem *> *items = [[VMemEngine shared] timelineItems];
     UIAlertController *ac = [UIAlertController alertControllerWithTitle:VL(@"Timeline_Title")
@@ -462,6 +488,18 @@ static VLMemResultsImpl *g_memResults = nil;
                                                          preferredStyle:UIAlertControllerStyleActionSheet];
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.dateFormat = @"HH:mm:ss";
+
+    VMemEngine *engine = [VMemEngine shared];
+    if ([engine canUndoLastManualWriteBatch]) {
+        NSString *title = [NSString stringWithFormat:@"%@ (%lu)",
+                                                     VL(@"Undo_Last_Modify"),
+                                                     (unsigned long)[engine lastManualWriteBatchCount]];
+        [ac addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+            NSUInteger restored = [engine undoLastManualWriteBatch];
+            [self loadResults];
+            showToast(restored > 0 ? VL(@"Undo_Success") : VL(@"Undo_Failed"));
+        }]];
+    }
 
     for (NSUInteger i = 0; i < items.count; i++) {
         VLMemTimelineItem *item = items[i];
@@ -478,6 +516,7 @@ static VLMemResultsImpl *g_memResults = nil;
                 [self loadResults];
                 showToast([NSString stringWithFormat:VL(@"Timeline_Restored_Fmt"), time, (unsigned long)item.resultCount]);
                 [[NSNotificationCenter defaultCenter] postNotificationName:@"VLMemResultsDidRestore" object:nil];
+                [self promptRestoreTimelineValuesAtIndex:i];
             } else {
                 showToast(VL(@"Timeline_Restore_Failed"));
             }
