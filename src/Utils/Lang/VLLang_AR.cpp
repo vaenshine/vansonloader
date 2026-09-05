@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangAR() {
     return {
+      {"Str_Undo_Button", "تراجع"},
+      {"Str_Reload_Button", "تحديث"},
         {"Tab_Ptr", "مؤشر"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "توقيع"},

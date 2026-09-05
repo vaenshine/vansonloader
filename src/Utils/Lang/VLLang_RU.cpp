@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangRU() {
     return {
+      {"Str_Undo_Button", "Отмена"},
+      {"Str_Reload_Button", "Обновить"},
         {"Tab_Ptr", "Указатель"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "Сигнатура"},

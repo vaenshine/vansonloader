@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangJA() {
     return {
+      {"Str_Undo_Button", "元に戻す"},
+      {"Str_Reload_Button", "再読込"},
         // タブラベル
         {"Tab_Ptr", "ポインタ"},
         {"Tab_RVA", "RVA"},

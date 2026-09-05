@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangTH() {
     return {
+      {"Str_Undo_Button", "เลิกทำ"},
+      {"Str_Reload_Button", "โหลดใหม่"},
         {"Tab_Ptr", "พอยน์เตอร์"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "ลายเซ็น"},

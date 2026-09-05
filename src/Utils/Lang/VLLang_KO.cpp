@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangKO() {
     return {
+      {"Str_Undo_Button", "실행 취소"},
+      {"Str_Reload_Button", "새로고침"},
         // 탭 라벨
         {"Tab_Ptr", "포인터"},
         {"Tab_RVA", "RVA"},

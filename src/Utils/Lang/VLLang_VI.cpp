@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangVI() {
     return {
+      {"Str_Undo_Button", "Hoàn tác"},
+      {"Str_Reload_Button", "Tải lại"},
         {"Tab_Ptr", "Con trỏ"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "Chữ ký"},

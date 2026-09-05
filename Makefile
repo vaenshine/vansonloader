@@ -44,6 +44,8 @@ VansonLoader_FILES = \
 	src/UI/VLItemEditor.m \
 	src/UI/VLMemorySearch.m \
 	src/UI/VLMemoryBrowser.m \
+	src/UI/VLStringEditorViewController.m \
+	src/UI/VLStringMemorySession.m \
 	src/UI/VLToolbox.m \
 	src/UI/VLMemResults.m \
 	src/UI/VLWatchOverlay.m \

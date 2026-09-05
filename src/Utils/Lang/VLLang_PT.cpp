@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangPT() {
     return {
+      {"Str_Undo_Button", "Desfazer"},
+      {"Str_Reload_Button", "Recarregar"},
         {"Tab_Ptr", "Ponteiro"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "Assinatura"},

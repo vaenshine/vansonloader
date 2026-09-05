@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangFR() {
     return {
+      {"Str_Undo_Button", "Annuler"},
+      {"Str_Reload_Button", "Recharger"},
         {"Tab_Ptr", "Pointeur"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "Signature"},

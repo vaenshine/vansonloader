@@ -5,6 +5,7 @@
  */
 
 #import "VLMemoryBrowser.h"
+#import "VLStringEditorViewController.h"
 #import "VLPanelSizeHelper.h"
 #import "VLDockBadge.h"
 #import "../Engine/VLMemEngine.h"
@@ -17,36 +18,7 @@ void showToast(NSString *msg);
 
 // 触摸穿透模式（在 VLTools.m 中定义）
 extern BOOL g_touchPassthroughMode;
-static const NSUInteger VL_STRING_EDIT_MAX_LEN = 8192;
 
-static BOOL VLStringEditVisibleByte(uint8_t b) {
-    return (b >= 0x20 && b <= 0x7E) || b >= 0xC0;
-}
-
-static NSString *VLStringEditReadVisible(uint64_t address, NSString *fallback, NSUInteger *lengthOut) {
-    NSData *data = [[VLMemEngine shared] readMemory:address length:VL_STRING_EDIT_MAX_LEN];
-    NSUInteger fallbackLen = [fallback lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-    if (data.length == 0) {
-        if (lengthOut) *lengthOut = fallbackLen;
-        return fallback ?: @"";
-    }
-
-    const uint8_t *bytes = (const uint8_t *)data.bytes;
-    NSUInteger len = 0;
-    while (len < data.length && len < VL_STRING_EDIT_MAX_LEN) {
-        if (bytes[len] == '\0') break;
-        if (!VLStringEditVisibleByte(bytes[len])) break;
-        len++;
-    }
-    if (len == 0) {
-        if (lengthOut) *lengthOut = fallbackLen;
-        return fallback ?: @"";
-    }
-
-    NSString *str = [[NSString alloc] initWithBytes:bytes length:len encoding:NSUTF8StringEncoding];
-    if (lengthOut) *lengthOut = str ? len : fallbackLen;
-    return str ?: (fallback ?: @"");
-}
 
 static BOOL VLInputLooksHex(NSString *input) {
     NSCharacterSet *hexLetters = [NSCharacterSet characterSetWithCharactersInString:@"abcdefABCDEF"];
@@ -1321,89 +1293,31 @@ static VLMemoryBrowserImpl *g_memBrowser = nil;
 }
 
 - (void)showStrEditAlert:(NSMutableDictionary *)item indexPath:(NSIndexPath *)indexPath {
-    uint64_t addr = [item[@"addr"] unsignedLongLongValue];
-    NSUInteger origSize = 0;
-    NSString *raw = VLStringEditReadVisible(addr, item[@"value"], &origSize);
-    item[@"fullValue"] = raw ?: @"";
-
-    NSString *msg = [NSString stringWithFormat:@"0x%llX\n%@ %lu\n\n\n\n\n\n\n\n\n\n", addr, VL(@"Browser_Str_OrigLen"), (unsigned long)origSize];
-
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:VL(@"Browser_Str_Edit") message:msg preferredStyle:UIAlertControllerStyleAlert];
-    UITextView *textView = [[UITextView alloc] initWithFrame:CGRectZero];
-    textView.text = raw ?: @"";
-    textView.font = [UIFont monospacedSystemFontOfSize:13 weight:UIFontWeightRegular];
-    textView.layer.borderWidth = 0.5;
-    textView.layer.borderColor = [UIColor.separatorColor CGColor];
-    textView.layer.cornerRadius = 6.0;
-    textView.translatesAutoresizingMaskIntoConstraints = NO;
-    [alert.view addSubview:textView];
-    [NSLayoutConstraint activateConstraints:@[
-        [textView.leadingAnchor constraintEqualToAnchor:alert.view.leadingAnchor constant:18],
-        [textView.trailingAnchor constraintEqualToAnchor:alert.view.trailingAnchor constant:-18],
-        [textView.topAnchor constraintEqualToAnchor:alert.view.topAnchor constant:104],
-        [textView.heightAnchor constraintEqualToConstant:220],
-    ]];
-    
-    __weak typeof(self) weakSelf = self;
-    VLMemWriteUndoItem *undo = [[VLMemEngine shared] lastManualWriteUndoForAddress:addr type:VMemDataTypeString];
-    if (undo) {
-        NSString *undoTitle = [NSString stringWithFormat:@"%@: %@", VL(@"Undo_Last_Modify"), undo.oldValue ?: @""];
-        [alert addAction:[UIAlertAction actionWithTitle:undoTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
-            BOOL ok = [[VLMemEngine shared] undoLastManualWriteForAddress:addr type:VMemDataTypeString];
-            if (ok) {
-                item[@"value"] = undo.oldValue ?: @"";
-                [weakSelf refreshCurrentData];
-                showToast(VL(@"Undo_Success"));
-            } else {
-                showToast(VL(@"Undo_Failed"));
-            }
-        }]];
-    }
-    [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Confirm") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
-        NSString *newVal = textView.text ?: @"";
-        NSUInteger newLen = [newVal lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        
-        if (newLen > origSize) {
-            NSString *warnMsg = [NSString stringWithFormat:VL(@"Browser_Str_Overflow_Msg"), (unsigned long)origSize, (unsigned long)newLen];
-            UIAlertController *warn = [UIAlertController alertControllerWithTitle:VL(@"Browser_Str_Overflow") message:warnMsg preferredStyle:UIAlertControllerStyleAlert];
-            [warn addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
-            [warn addAction:[UIAlertAction actionWithTitle:VL(@"Browser_Str_Force_Write") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a2) {
-                [weakSelf writeStr:newVal toItem:item indexPath:indexPath];
-            }]];
-            UIViewController *root = GetSafeWindow().rootViewController;
-            while (root.presentedViewController) root = root.presentedViewController;
-            [root presentViewController:warn animated:YES completion:nil];
-        } else {
-            [weakSelf writeStr:newVal toItem:item indexPath:indexPath];
-        }
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:VL(@"Alert_Cancel") style:UIAlertActionStyleCancel handler:nil]];
-    
+    VMemEngine *engine = [VMemEngine shared];
+    VLStringMemorySession *session = [VLStringMemorySession new];
+    session.targetIsValid = ^BOOL { return engine.isReady; };
+    session.reader = ^NSData *(uint64_t addr, NSUInteger length) {
+        return [engine readMemory:addr length:length];
+    };
+    session.writer = ^BOOL(uint64_t addr, NSData *data) {
+        return [engine writeMemory:addr data:data];
+    };
+    session.didWrite = ^(uint64_t addr, NSData *before, NSData *after) {
+        [engine rememberManualWriteUndoAtAddress:addr type:VMemDataTypeString
+            oldValue:[VLStringMemorySession escapedTextForData:before]
+            oldData:before newValue:[VLStringMemorySession escapedTextForData:after]];
+    };
+    VLStringEditorViewController *editor = [VLStringEditorViewController new];
+    editor.session = session;
+    editor.initialAddress = [item[@"addr"] unsignedLongLongValue];
+    __weak __typeof(self) weakSelf = self;
+    editor.didChangeMemory = ^{ [weakSelf refreshCurrentData]; };
+    UINavigationController *navigation =
+        [[UINavigationController alloc] initWithRootViewController:editor];
+    navigation.modalPresentationStyle = UIModalPresentationFullScreen;
     UIViewController *root = GetSafeWindow().rootViewController;
     while (root.presentedViewController) root = root.presentedViewController;
-    [root presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)writeStr:(NSString *)newVal toItem:(NSMutableDictionary *)item indexPath:(NSIndexPath *)indexPath {
-    uint64_t addr = [item[@"addr"] unsignedLongLongValue];
-    const char *cstr = [newVal UTF8String];
-    NSUInteger writeLen = strlen(cstr) + 1;
-    NSString *oldVal = item[@"fullValue"] ?: item[@"value"] ?: @"";
-    NSUInteger oldSize = MAX([[oldVal dataUsingEncoding:NSUTF8StringEncoding] length] + 1, writeLen);
-    NSData *oldData = [[VLMemEngine shared] readMemory:addr length:oldSize];
-    [[VLMemEngine shared] rememberManualWriteUndoAtAddress:addr
-                                                     type:VMemDataTypeString
-                                                 oldValue:oldVal
-                                                  oldData:oldData
-                                                 newValue:newVal];
-    NSData *data = [NSData dataWithBytes:cstr length:writeLen];
-    [[VLMemEngine shared] writeMemory:addr data:data];
-    
-    item[@"value"] = newVal;
-    [item removeObjectForKey:@"fullValue"];
-    item[@"originalSize"] = @(writeLen - 1);
-    [_tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
-    showToast(VL(@"Mem_WriteOK"));
+    [root presentViewController:navigation animated:YES completion:nil];
 }
 
 - (UIToolbar *)createKeyboardToolbar:(UITextField *)tf {

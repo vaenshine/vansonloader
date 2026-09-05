@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangES() {
     return {
+      {"Str_Undo_Button", "Deshacer"},
+      {"Str_Reload_Button", "Recargar"},
         {"Tab_Ptr", "Puntero"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "Firma"},

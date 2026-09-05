@@ -7,6 +7,8 @@
 
 std::map<std::string, std::string> getLangDE() {
     return {
+      {"Str_Undo_Button", "Rückgängig"},
+      {"Str_Reload_Button", "Neu laden"},
         {"Tab_Ptr", "Zeiger"},
         {"Tab_RVA", "RVA"},
         {"Tab_Sig", "Signatur"},
