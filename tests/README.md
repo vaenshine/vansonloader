@@ -36,3 +36,22 @@ independent of row positions. Each editor retains up to 10 original byte
 snapshots for undo. Saves compare the source snapshot, write the selected bytes,
 and compare the readback. This cannot make live target memory updates atomic
 or validate application-specific object invariants.
+
+## 64-bit integer scan regression
+
+```sh
+bash tests/run_u64_memory_tests.sh
+```
+
+This builds the production `src/Core/VLMemCore.cpp` on macOS with mock Mach
+memory APIs and AddressSanitizer/UndefinedBehaviorSanitizer. The fixture uses
+synthetic memory regions and temporary result files, and removes its build and
+output directory when finished.
+
+Coverage includes the reported value `4114578669569` at all eight address
+residues, page and 1 MiB chunk crossings, short final chunks and successful short
+reads, exact search/rescan, unsigned values above `INT64_MAX`, signed ranges
+spanning zero, and search-window bounds. Ordered, anchor, wildcard, and skip
+layout groups exercise peers across chunks, including huge group ranges with
+bounded reads. I32/U32/F32/F64 stepping and byte-based string search are also
+checked. Initial fuzzy scans retain their existing alignment behavior.

@@ -68,6 +68,19 @@ static inline uint64_t regionEnd(uint64_t start, uint64_t size) {
     return end < start ? UINT64_MAX : end;
 }
 
+// Numeric width and candidate alignment are independent. Packed 64-bit
+// integers may start at any byte, including the last bytes of a scan chunk.
+static inline size_t scanStepForType(MemDataType type) {
+    return (type == MemDataType::Int64 || type == MemDataType::UInt64)
+        ? 1 : getSizeForType(type);
+}
+
+template <typename T> static inline T loadUnaligned(const void* ptr) {
+    T value;
+    memcpy(&value, ptr, sizeof(value));
+    return value;
+}
+
 struct ExcludedRange {
     uint64_t start;
     uint64_t end;
@@ -308,7 +321,7 @@ static bool groupUsesLayoutMode(const std::vector<GroupItem>& items) {
 static bool matchGroupValue(const void* ptr, const GroupItem& item, double floatTolerance) {
     if (item.isWildcard) return true;
     if (vcore::isFloatType(item.type)) {
-        double v = (item.type == MemDataType::Float) ? *(const float*)ptr : *(const double*)ptr;
+        double v = (item.type == MemDataType::Float) ? loadUnaligned<float>(ptr) : loadUnaligned<double>(ptr);
         double target = (item.type == MemDataType::Float) ? (double)item.value.f : item.value.d;
         return std::abs(v - target) <= floatTolerance;
     }
@@ -316,10 +329,10 @@ static bool matchGroupValue(const void* ptr, const GroupItem& item, double float
     size_t sz = getSizeForType(item.type);
     int64_t v = 0, target = 0;
     switch (item.type) {
-        case MemDataType::Int8:   v = *(const int8_t*)ptr; target = item.value.i8; break;
-        case MemDataType::Int16:  v = *(const int16_t*)ptr; target = item.value.i16; break;
-        case MemDataType::Int32:  v = *(const int32_t*)ptr; target = item.value.i32; break;
-        case MemDataType::Int64:  v = *(const int64_t*)ptr; target = item.value.i64; break;
+        case MemDataType::Int8:   v = loadUnaligned<int8_t>(ptr); target = item.value.i8; break;
+        case MemDataType::Int16:  v = loadUnaligned<int16_t>(ptr); target = item.value.i16; break;
+        case MemDataType::Int32:  v = loadUnaligned<int32_t>(ptr); target = item.value.i32; break;
+        case MemDataType::Int64:  v = loadUnaligned<int64_t>(ptr); target = item.value.i64; break;
         default: {
             uint64_t uv = 0;
             memcpy(&uv, ptr, sz > 8 ? 8 : sz);
@@ -333,30 +346,102 @@ static bool matchGroupValue(const void* ptr, const GroupItem& item, double float
                            (((uint64_t)target) & 0xFFFFFFFFFFFFULL));
 }
 
-static bool matchGroupLayoutAt(uint8_t* memBuffer, size_t readSize,
-                               size_t startOffset,
-                               const std::vector<GroupItem>& items,
-                               double floatTolerance,
-                               std::vector<std::pair<uint64_t, size_t>>& matches,
-                               uint64_t chunkBase) {
-    size_t cursor = startOffset;
-    matches.clear();
-    for (size_t i = 0; i < items.size(); ++i) {
-        const GroupItem& item = items[i];
-        if (item.skipBytes > 0) {
-            if (cursor + item.skipBytes > readSize) return false;
-            cursor += (size_t)item.skipBytes;
-            continue;
+// Group peers can sit outside the primary chunk. Read them on demand with a
+// fixed cache instead of allocating memory proportional to a user-supplied range.
+struct GroupScanReader {
+    mach_port_t task;
+    uint64_t regionStart, regionEndAddress, chunkStart;
+    const uint8_t* chunk;
+    size_t chunkLength;
+    uint8_t cache[4096 + 7];
+    uint64_t cacheStart = 0;
+    size_t cacheLength = 0;
+
+    const uint8_t* read(uint64_t address, size_t width) {
+        if (address < regionStart || address >= regionEndAddress ||
+            width > regionEndAddress - address) return nullptr;
+        if (address >= chunkStart && address - chunkStart <= chunkLength &&
+            width <= chunkLength - (size_t)(address - chunkStart)) {
+            return chunk + (address - chunkStart);
         }
-        size_t itemSize = getSizeForType(item.type);
-        if (cursor + itemSize > readSize) return false;
-        if (!item.isWildcard && !matchGroupValue(memBuffer + cursor, item, floatTolerance)) {
-            return false;
+        if (address >= cacheStart && address - cacheStart <= cacheLength &&
+            width <= cacheLength - (size_t)(address - cacheStart)) {
+            return cache + (address - cacheStart);
         }
-        if (!item.isWildcard) matches.push_back({chunkBase + cursor, i});
-        cursor += itemSize;
+        cacheStart = address;
+        cacheLength = 0;
+        size_t wanted = (size_t)std::min((uint64_t)sizeof(cache), regionEndAddress - address);
+        mach_vm_size_t got = 0;
+        if (mach_vm_read_overwrite(task, address, wanted,
+                                  (mach_vm_address_t)cache, &got) == KERN_SUCCESS &&
+            got <= wanted) cacheLength = (size_t)got;
+        if (cacheLength < width) {
+            // A large speculative read may race a protection change. Require
+            // the entire actual value when retrying with its precise width.
+            got = 0;
+            cacheLength = 0;
+            if (mach_vm_read_overwrite(task, address, width,
+                                      (mach_vm_address_t)cache, &got) == KERN_SUCCESS &&
+                got == width) cacheLength = width;
+        }
+        return cacheLength >= width ? cache : nullptr;
     }
-    return !matches.empty();
+};
+
+static bool matchGroupAt(GroupScanReader& reader, uint64_t anchor,
+                         const std::vector<GroupItem>& items, bool layout,
+                         bool anchorMode, uint64_t range, double tolerance,
+                         const std::vector<ExcludedRange>& excluded,
+                         std::vector<RawResult>& matches) {
+    matches.clear();
+    auto matchItem = [&](uint64_t address, const GroupItem& item) {
+        size_t width = getSizeForType(item.type);
+        if (overlapsExcludedRange(excluded, address, width)) return false;
+        const uint8_t* value = reader.read(address, width);
+        if (!value || !matchGroupValue(value, item, tolerance)) return false;
+        if (!item.isWildcard) {
+            uint64_t bits = 0;
+            memcpy(&bits, value, width);
+            matches.push_back(makeRawResult(address, bits, item.type));
+        }
+        return true;
+    };
+    if (layout) {
+        uint64_t cursor = anchor;
+        for (const auto& item : items) {
+            uint64_t width = item.skipBytes > 0 ? item.skipBytes : getSizeForType(item.type);
+            if (cursor >= reader.regionEndAddress || width > reader.regionEndAddress - cursor)
+                return false;
+            if (item.skipBytes == 0 && !matchItem(cursor, item)) return false;
+            cursor += width;
+        }
+        return !matches.empty();
+    }
+    if (items.empty() || !matchItem(anchor, items[0])) return false;
+    uint64_t lastMatch = anchor;
+    for (size_t g = 1; g < items.size(); ++g) {
+        size_t width = getSizeForType(items[g].type);
+        if (width > reader.regionEndAddress - reader.regionStart) return false;
+        uint64_t from = anchorMode
+            ? std::max(reader.regionStart, anchor > range ? anchor - range : 0)
+            : regionEnd(lastMatch, 1);
+        uint64_t through = std::min(reader.regionEndAddress - width,
+                                    regionEnd(anchorMode ? anchor : lastMatch, range));
+        bool found = false;
+        for (uint64_t address = from; address <= through; ++address) {
+            if (anchorMode && address == anchor) continue;
+            if (matchItem(address, items[g])) {
+                found = true;
+                lastMatch = address;
+                break;
+            }
+        }
+        if (!found) return false;
+    }
+    std::sort(matches.begin(), matches.end(), [](const RawResult& a, const RawResult& b) {
+        return a.address < b.address;
+    });
+    return true;
 }
 
 std::vector<GroupItem> MemCore::parseGroupString(const std::string& groupStr,
@@ -585,7 +670,9 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
         
         if ((info.protection & VM_PROT_READ) && (info.protection & VM_PROT_WRITE)) {
             if (size <= 1024 * 1024 * 1024) {
-                regions.push_back({address, size});
+                uint64_t scanStart = std::max((uint64_t)address, start);
+                uint64_t scanEnd = std::min(regionEnd(address, size), endAddress);
+                if (scanStart < scanEnd) regions.push_back({scanStart, scanEnd - scanStart});
             }
         }
         uint64_t nextAddress = regionEnd(address, size);
@@ -639,9 +726,8 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                     if (mach_vm_read_overwrite(task, curr, chunkSize,
                                                (mach_vm_address_t)memBuffer,
                                                &readSize) == KERN_SUCCESS) {
-                        size_t limit = readSize >= dSize ? readSize - dSize : 0;
                         std::vector<RawResult> chunkResults;
-                        for (size_t k = 0; k <= limit; k += dSize) {
+                        for (size_t k = 0; k + dSize <= readSize; k += dSize) {
                             uint64_t val = 0;
                             memcpy(&val, memBuffer + k, std::min((size_t)8, dSize));
                             chunkResults.push_back(makeRawResult(curr + k, val, dType));
@@ -686,226 +772,102 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                        ^(size_t i) {
             Region r = regions[i];
             uint64_t rEnd = std::min(regionEnd(r.start, r.size), endAddress);
-            size_t chunkBufferSize = 1024 * 1024;
-            uint8_t* memBuffer = (uint8_t*)malloc(chunkBufferSize);
+            const size_t chunkBufferSize = 1024 * 1024;
+            size_t candidateSize = dataSizeLocal;
+            size_t step = scanStepForType(dType);
+            if (searchModeLocal == 2 && groupLayoutModeLocal) {
+                candidateSize = 1;
+                step = 1;
+                for (const auto& item : gItemsCopy) {
+                    if (item.skipBytes == 0) {
+                        step = item.isWildcard ? 1 : scanStepForType(item.type);
+                        break;
+                    }
+                }
+            } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
+                candidateSize = getSizeForType(gItemsCopy[0].type);
+                step = scanStepForType(gItemsCopy[0].type);
+            } else if (isStringTypeLocal) {
+                candidateSize = std::max((size_t)1, targetStringLenLocal);
+                step = 1;
+            } else if (isAutoTypeLocal) {
+                candidateSize = (dataTypeInt == (int)MemDataType::FloatAuto) ? 4 : 1;
+                step = candidateSize;
+            }
+            bool prefilter64BitExact = searchModeLocal == 0 &&
+                (dType == MemDataType::Int64 || dType == MemDataType::UInt64);
+            size_t lookAhead = std::max((size_t)7, candidateSize - 1);
+            size_t bufferCapacity = (size_t)std::min(r.size,
+                regionEnd(chunkBufferSize, lookAhead));
+            uint8_t* memBuffer = (uint8_t*)malloc(bufferCapacity);
             if (!memBuffer) return;
 
+            GroupScanReader groupReader{task, r.start, rEnd, 0, memBuffer, 0, {}};
             std::vector<ExcludedRange> localExcludedRanges = excludedRangesCopy;
-            addExcludedRange(localExcludedRanges, memBuffer, chunkBufferSize, 0);
-            
+            addExcludedRange(localExcludedRanges, memBuffer, bufferCapacity, 0);
+            addExcludedRange(localExcludedRanges, groupReader.cache, sizeof(groupReader.cache), 0);
             std::vector<RawResult>& localResults = perRegionResultsPtr[i];
             uint64_t curr = r.start;
-            
-            while (curr < rEnd) {
-                uint64_t chunkSize = std::min(chunkBufferSize, (size_t)(rEnd - curr));
-                mach_vm_size_t readSize = chunkSize;
-                if (mach_vm_read_overwrite(task, curr, chunkSize,
-                                           (mach_vm_address_t)memBuffer,
-                                           &readSize) == KERN_SUCCESS) {
-                    size_t limit;
-                    if (searchModeLocal == 2 && groupLayoutModeLocal) {
-                        limit = readSize > 0 ? readSize - 1 : 0;
-                    } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
-                        limit = readSize >= getSizeForType(gItemsCopy[0].type)
-                            ? readSize - getSizeForType(gItemsCopy[0].type) : 0;
-                    } else if (isStringTypeLocal && targetStringLenLocal > 0) {
-                        limit = readSize >= targetStringLenLocal ? readSize - targetStringLenLocal : 0;
-                    } else {
-                        limit = readSize >= dataSizeLocal ? readSize - dataSizeLocal : 0;
-                    }
-                    size_t step = dataSizeLocal;
-                    
-                    if (searchModeLocal == 2 && groupLayoutModeLocal) {
-                        step = 1;
-                        for (const auto& item : gItemsCopy) {
-                            if (item.skipBytes == 0) {
-                                step = item.isWildcard ? 1 : getSizeForType(item.type);
-                                break;
-                            }
-                        }
-                    } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
-                        step = getSizeForType(gItemsCopy[0].type);
-                    } else if (isStringTypeLocal) {
-                        step = 1;
-                    } else if (isAutoTypeLocal) {
-                        step = (dataTypeInt == (int)MemDataType::FloatAuto) ? 4 : 1;
-                    }
 
+            while (curr < rEnd) {
+                size_t chunkSize = (size_t)std::min((uint64_t)chunkBufferSize, rEnd - curr);
+                size_t readLength = (size_t)std::min(rEnd - curr,
+                    regionEnd(chunkSize, lookAhead));
+                mach_vm_size_t readSize = 0;
+                if (mach_vm_read_overwrite(task, curr, readLength,
+                                           (mach_vm_address_t)memBuffer,
+                                           &readSize) == KERN_SUCCESS &&
+                    readSize <= readLength && readSize >= candidateSize) {
+                    // Look-ahead bytes complete values while this chunk exclusively
+                    // owns candidate starts, preventing overlap duplicates.
+                    size_t limit = std::min((size_t)readSize - candidateSize, chunkSize - 1);
+                    groupReader.chunkStart = curr;
+                    groupReader.chunkLength = (size_t)readSize;
+                    groupReader.cacheLength = 0;
                     for (size_t k = 0; k <= limit; k += step) {
+                        if (prefilter64BitExact && memBuffer[k] != (uint8_t)targetUInt64) {
+                            // The low byte is required by both full equality and
+                            // I64 pointer masking. Search only owned candidate starts;
+                            // every surviving candidate still gets the full comparison.
+                            const void* found = memchr(memBuffer + k,
+                                                       (int)(targetUInt64 & 0xFF),
+                                                       limit - k + 1);
+                            if (!found) break;
+                            k = (const uint8_t*)found - memBuffer;
+                        }
                         bool match = false;
                         uint64_t valBits = 0;
                         void* ptr = memBuffer + k;
-                        size_t candidateSize = dataSizeLocal;
-                        if (searchModeLocal == 2 && groupLayoutModeLocal) {
-                            std::vector<std::pair<uint64_t, size_t>> matchedItems;
-                            if (matchGroupLayoutAt(memBuffer, readSize, k, gItemsCopy,
-                                                   floatTolerance, matchedItems, curr)) {
-                                for (const auto& matchedItem : matchedItems) {
-                                    uint64_t addr = matchedItem.first;
-                                    size_t itemIndex = matchedItem.second;
-                                    size_t valueSize = getSizeForType(gItemsCopy[itemIndex].type);
-                                    if (overlapsExcludedRange(localExcludedRanges, addr, valueSize)) continue;
-                                    RawResult res;
-                                    res.address = addr;
-                                    res.type = (uint8_t)gItemsCopy[itemIndex].type;
-                                    res.value = 0;
-                                    memcpy(&res.value, memBuffer + (addr - curr),
-                                           std::min((size_t)8, valueSize));
-                                    memset(res.padding, 0, sizeof(res.padding));
-                                    localResults.push_back(res);
-                                }
-                            }
-                            continue;
-                        } else if (searchModeLocal == 2 && !gItemsCopy.empty()) {
-                            candidateSize = getSizeForType(gItemsCopy[0].type);
-                        } else if (isStringTypeLocal && targetStringLenLocal > 0) {
-                            candidateSize = targetStringLenLocal;
-                        }
-                        if (overlapsExcludedRange(localExcludedRanges, curr + k, candidateSize)) {
-                            continue;
-                        }
-                        
+                        if (overlapsExcludedRange(localExcludedRanges, curr + k, candidateSize)) continue;
+
                         if (searchModeLocal == 2 && !gItemsCopy.empty()) {
-                            // ========== 联合搜索实现 ==========
-                            const auto& firstItem = gItemsCopy[0];
-                            bool firstMatch = false;
-                            bool firstIsFloat = vcore::isFloatType(firstItem.type);
-                            
-                            if (firstIsFloat) {
-                                double v = (firstItem.type == MemDataType::Float)
-                                    ? *(float*)ptr : *(double*)ptr;
-                                double tgtVal = (firstItem.type == MemDataType::Float)
-                                    ? (double)firstItem.value.f : firstItem.value.d;
-                                if (std::abs(v - tgtVal) <= floatTolerance)
-                                    firstMatch = true;
-                            } else {
-                                size_t sz = getSizeForType(firstItem.type);
-                                int64_t v = 0, target = 0;
-                                switch (firstItem.type) {
-                                    case MemDataType::Int8:   v = *(int8_t*)ptr; target = firstItem.value.i8; break;
-                                    case MemDataType::Int16:  v = *(int16_t*)ptr; target = firstItem.value.i16; break;
-                                    case MemDataType::Int32:  v = *(int32_t*)ptr; target = firstItem.value.i32; break;
-                                    case MemDataType::Int64:  v = *(int64_t*)ptr; target = firstItem.value.i64; break;
-                                    default: {
-                                        uint64_t uv = 0;
-                                        memcpy(&uv, ptr, sz > 8 ? 8 : sz);
-                                        v = (int64_t)uv;
-                                        target = (int64_t)firstItem.value.u64;
-                                        break;
-                                    }
-                                }
-                                // Int64 高位剥离处理（用于指针搜索）
-                                if (v == target || (firstItem.type == MemDataType::Int64 &&
-                                    (v & 0xFFFFFFFFFFFF) == (target & 0xFFFFFFFFFFFF)))
-                                    firstMatch = true;
-                            }
-                            
-                            if (firstMatch) {
-                                bool allMatched = true;
-                                std::vector<std::pair<uint64_t, size_t>> matchedItems;
-                                matchedItems.push_back({curr + k, 0});
-                                size_t anchorOffset = k;
-                                size_t lastMatchOffset = k;
-                                
-                                for (size_t g = 1; g < gItemsCopy.size(); ++g) {
-                                    const auto& nextItem = gItemsCopy[g];
-                                    bool foundNext = false;
-                                    size_t nextSz = getSizeForType(nextItem.type);
-                                    bool nextIsFloat = vcore::isFloatType(nextItem.type);
-                                    
-                                    size_t minOff, maxOff;
-                                    if (groupAnchorModeLocal) {
-                                        minOff = (k > groupRangeLocal) ? k - groupRangeLocal : 0;
-                                        maxOff = std::min((size_t)readSize, (size_t)(k + groupRangeLocal + 1));
-                                    } else {
-                                        minOff = lastMatchOffset + 1;
-                                        maxOff = std::min((size_t)readSize, (size_t)(lastMatchOffset + groupRangeLocal + 1));
-                                    }
-                                    
-                                    for (size_t off = minOff; off < maxOff; ++off) {
-                                        if (groupAnchorModeLocal && off == anchorOffset) continue;
-                                        if (off + nextSz > readSize) continue;
-                                        if (overlapsExcludedRange(localExcludedRanges, curr + off, nextSz)) continue;
-                                        void* nPtr = memBuffer + off;
-                                        
-                                        if (nextIsFloat) {
-                                            double nv = (nextItem.type == MemDataType::Float)
-                                                ? *(float*)nPtr : *(double*)nPtr;
-                                            double nTargetVal = (nextItem.type == MemDataType::Float)
-                                                ? (double)nextItem.value.f : nextItem.value.d;
-                                            if (std::abs(nv - nTargetVal) <= floatTolerance) {
-                                                foundNext = true;
-                                                matchedItems.push_back({curr + off, g});
-                                                lastMatchOffset = off;
-                                                break;
-                                            }
-                                        } else {
-                                            int64_t nv = 0, nTarget = 0;
-                                            switch (nextItem.type) {
-                                                case MemDataType::Int8:   nv = *(int8_t*)nPtr; nTarget = nextItem.value.i8; break;
-                                                case MemDataType::Int16:  nv = *(int16_t*)nPtr; nTarget = nextItem.value.i16; break;
-                                                case MemDataType::Int32:  nv = *(int32_t*)nPtr; nTarget = nextItem.value.i32; break;
-                                                case MemDataType::Int64:  nv = *(int64_t*)nPtr; nTarget = nextItem.value.i64; break;
-                                                default: {
-                                                    uint64_t uv = 0;
-                                                    memcpy(&uv, nPtr, nextSz > 8 ? 8 : nextSz);
-                                                    nv = (int64_t)uv;
-                                                    nTarget = (int64_t)nextItem.value.u64;
-                                                    break;
-                                                }
-                                            }
-                                            // Int64 高位剥离处理
-                                            if (nv == nTarget || (nextItem.type == MemDataType::Int64 &&
-                                                (nv & 0xFFFFFFFFFFFF) == (nTarget & 0xFFFFFFFFFFFF))) {
-                                                foundNext = true;
-                                                matchedItems.push_back({curr + off, g});
-                                                lastMatchOffset = off;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    if (!foundNext) {
-                                        allMatched = false;
-                                        break;
-                                    }
-                                }
-                                
-                                if (allMatched) {
-                                    std::sort(matchedItems.begin(), matchedItems.end(),
-                                              [](const std::pair<uint64_t, size_t>& a,
-                                                 const std::pair<uint64_t, size_t>& b) {
-                                        return a.first < b.first;
-                                    });
-                                    for (const auto& matchedItem : matchedItems) {
-                                        uint64_t addr = matchedItem.first;
-                                        size_t itemIndex = matchedItem.second;
-                                        RawResult res;
-                                        res.address = addr;
-                                        res.type = (uint8_t)gItemsCopy[itemIndex].type;
-                                        res.value = 0;
-                                        size_t valueSize = getSizeForType(gItemsCopy[itemIndex].type);
-                                        memcpy(&res.value, memBuffer + (addr - curr),
-                                               std::min((size_t)8, valueSize));
-                                        memset(res.padding, 0, sizeof(res.padding));
-                                        localResults.push_back(res);
-                                    }
-                                }
+                            std::vector<RawResult> matchedItems;
+                            if (matchGroupAt(groupReader, curr + k, gItemsCopy,
+                                             groupLayoutModeLocal, groupAnchorModeLocal,
+                                             groupRangeLocal, floatTolerance,
+                                             localExcludedRanges, matchedItems)) {
+                                localResults.insert(localResults.end(), matchedItems.begin(), matchedItems.end());
                             }
                         } else if (searchModeLocal == 3) {  // Range
                             if (isFloatTypeLocal) {
                                 double v = (dataTypeInt == (int)MemDataType::Float) 
-                                    ? (double)(*(float*)ptr) : *(double*)ptr;
+                                    ? (double)(loadUnaligned<float>(ptr)) : loadUnaligned<double>(ptr);
                                 double minV = (dataTypeInt == (int)MemDataType::Float) 
                                     ? (double)minFloat : minDouble;
                                 double maxV = (dataTypeInt == (int)MemDataType::Float) 
                                     ? (double)maxFloat : maxDouble;
                                 match = (v >= minV && v <= maxV);
                                 valBits = (dataTypeInt == (int)MemDataType::Float) 
-                                    ? *(uint32_t*)ptr : *(uint64_t*)ptr;
+                                    ? loadUnaligned<uint32_t>(ptr) : loadUnaligned<uint64_t>(ptr);
                             } else {
                                 uint64_t v = 0;
                                 memcpy(&v, ptr, dataSizeLocal > 8 ? 8 : dataSizeLocal);
-                                match = (v >= (uint64_t)minInt64 && v <= (uint64_t)maxInt64);
+                                if (dType == MemDataType::Int64) {
+                                    int64_t signedValue = loadUnaligned<int64_t>(ptr);
+                                    match = (signedValue >= minInt64 && signedValue <= maxInt64);
+                                } else {
+                                    match = (v >= (uint64_t)minInt64 && v <= (uint64_t)maxInt64);
+                                }
                                 valBits = v;
                             }
                         } else if (isStringTypeLocal) {
@@ -927,24 +889,24 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                     uint64_t subValBits = 0;
                                     
                                     if (subType == MemDataType::Float) {
-                                        float v = *(float*)ptr;
+                                        float v = loadUnaligned<float>(ptr);
                                         subMatch = (std::abs((double)v - targetDouble) <= floatTolerance);
                                         memcpy(&subValBits, ptr, 4);
                                     } else if (subType == MemDataType::Double) {
-                                        double v = *(double*)ptr;
+                                        double v = loadUnaligned<double>(ptr);
                                         subMatch = (std::abs(v - targetDouble) <= floatTolerance);
                                         memcpy(&subValBits, ptr, 8);
                                     } else {
                                         int64_t v = 0;
                                         switch (subType) {
-                                            case MemDataType::Int8:   v = *(int8_t*)ptr; subValBits = (uint64_t)(uint8_t)v; break;
-                                            case MemDataType::Int16:  v = *(int16_t*)ptr; subValBits = (uint64_t)(uint16_t)v; break;
-                                            case MemDataType::Int32:  v = *(int32_t*)ptr; subValBits = (uint64_t)(uint32_t)v; break;
-                                            case MemDataType::Int64:  v = *(int64_t*)ptr; subValBits = (uint64_t)v; break;
-                                            case MemDataType::UInt8:  v = *(uint8_t*)ptr; subValBits = (uint64_t)*(uint8_t*)ptr; break;
-                                            case MemDataType::UInt16: v = *(uint16_t*)ptr; subValBits = (uint64_t)*(uint16_t*)ptr; break;
-                                            case MemDataType::UInt32: v = *(uint32_t*)ptr; subValBits = (uint64_t)*(uint32_t*)ptr; break;
-                                            case MemDataType::UInt64: v = (int64_t)*(uint64_t*)ptr; subValBits = *(uint64_t*)ptr; break;
+                                            case MemDataType::Int8:   v = loadUnaligned<int8_t>(ptr); subValBits = (uint64_t)(uint8_t)v; break;
+                                            case MemDataType::Int16:  v = loadUnaligned<int16_t>(ptr); subValBits = (uint64_t)(uint16_t)v; break;
+                                            case MemDataType::Int32:  v = loadUnaligned<int32_t>(ptr); subValBits = (uint64_t)(uint32_t)v; break;
+                                            case MemDataType::Int64:  v = loadUnaligned<int64_t>(ptr); subValBits = (uint64_t)v; break;
+                                            case MemDataType::UInt8:  v = loadUnaligned<uint8_t>(ptr); subValBits = (uint64_t)loadUnaligned<uint8_t>(ptr); break;
+                                            case MemDataType::UInt16: v = loadUnaligned<uint16_t>(ptr); subValBits = (uint64_t)loadUnaligned<uint16_t>(ptr); break;
+                                            case MemDataType::UInt32: v = loadUnaligned<uint32_t>(ptr); subValBits = (uint64_t)loadUnaligned<uint32_t>(ptr); break;
+                                            case MemDataType::UInt64: v = (int64_t)loadUnaligned<uint64_t>(ptr); subValBits = loadUnaligned<uint64_t>(ptr); break;
                                             default: break;
                                         }
                                         subMatch = (v == targetInt64);
@@ -963,12 +925,12 @@ std::vector<ScanResult> MemCore::scan(MemDataType type, const std::string& value
                                 }
                             } else if (isFloatTypeLocal) {
                                 double v = (dataTypeInt == (int)MemDataType::Float) 
-                                    ? (double)(*(float*)ptr) : *(double*)ptr;
+                                    ? (double)(loadUnaligned<float>(ptr)) : loadUnaligned<double>(ptr);
                                 double tgtVal = (dataTypeInt == (int)MemDataType::Float) 
                                     ? (double)targetFloat : targetDouble;
                                 match = (std::abs(v - tgtVal) <= floatTolerance);
                                 valBits = (dataTypeInt == (int)MemDataType::Float) 
-                                    ? *(uint32_t*)ptr : *(uint64_t*)ptr;
+                                    ? loadUnaligned<uint32_t>(ptr) : loadUnaligned<uint64_t>(ptr);
                             } else {
                                 uint64_t v = 0;
                                 memcpy(&v, ptr, dataSizeLocal > 8 ? 8 : dataSizeLocal);
@@ -1105,7 +1067,8 @@ std::vector<ScanResult> MemCore::nextScan(MemDataType type, const std::string& v
             uint8_t buf[8] = {0};
             mach_vm_size_t rSz = actualSize;
             if (mach_vm_read_overwrite(task, raw.address, actualSize,
-                                       (mach_vm_address_t)buf, &rSz) != KERN_SUCCESS) continue;
+                                       (mach_vm_address_t)buf, &rSz) != KERN_SUCCESS ||
+                rSz != actualSize) continue;
             
             bool match = false;
             if (storedType == MemDataType::String) {
@@ -1247,14 +1210,14 @@ std::vector<ScanResult> MemCore::scanNearby(MemDataType type, const std::string&
                 if (isStringType) {
                     match = (memcmp(ptr, targetString.c_str(), targetStringLen) == 0);
                 } else if (type == MemDataType::Float) {
-                    match = (fabs(*(float*)ptr - target.f) <= (float)_floatTolerance);
+                    match = (fabs(loadUnaligned<float>(ptr) - target.f) <= (float)_floatTolerance);
                 } else if (type == MemDataType::Double) {
-                    match = (fabs(*(double*)ptr - target.d) <= _floatTolerance);
+                    match = (fabs(loadUnaligned<double>(ptr) - target.d) <= _floatTolerance);
                 } else {
-                    if (dataSize == 4) match = (*(int32_t*)ptr == target.i32);
-                    else if (dataSize == 8) match = (*(int64_t*)ptr == target.i64);
-                    else if (dataSize == 2) match = (*(int16_t*)ptr == target.i16);
-                    else if (dataSize == 1) match = (*(int8_t*)ptr == target.i8);
+                    if (dataSize == 4) match = (loadUnaligned<int32_t>(ptr) == target.i32);
+                    else if (dataSize == 8) match = (loadUnaligned<int64_t>(ptr) == target.i64);
+                    else if (dataSize == 2) match = (loadUnaligned<int16_t>(ptr) == target.i16);
+                    else if (dataSize == 1) match = (loadUnaligned<int8_t>(ptr) == target.i8);
                 }
                 if (match) {
                     uint64_t addr = start + i;
